@@ -486,8 +486,11 @@ theorem setPseudo_remainder_eq_setPseudoRem : (g.setPseudo S).remainder = g.setP
     have := setPseudoGo_drop_succ_remainder_eq S (lt_add_one n) (h ▸ le_refl _) ([]) ([]) g
     simp only [tsub_self, TriangularSet.drop_zero, add_tsub_cancel_left] at this
     rw [this, ih _ (by simp [h, add_tsub_cancel_right]), toList_drop, drop_one]
-    have h : S.toList ≠ [] := length_pos_iff.mp (length_toList S ▸ h ▸ Nat.zero_lt_succ n)
-    rw [← cons_head_tail h, foldr_cons, cons_head_tail, head_eq_getElem_zero, toList_getElem]
+    have hlen : 0 < S.length := h ▸ Nat.zero_lt_succ n
+    have h : S.toList ≠ [] := length_pos_iff.mp (length_toList S ▸ hlen)
+    have hhead : S.toList.head h = S 0 := by
+      rw [head_eq_getElem_zero]; exact toList_getElem hlen
+    rw [← cons_head_tail h, foldr_cons, cons_head_tail, hhead]
 
 lemma setPseudoRem_reducedTo (l : List (MvPolynomial σ R)) (hl1 : ∀ ⦃p⦄, p ∈ l → p ≠ 0)
     (hl2 : l.Pairwise fun p q ↦ p.vars.max < q.vars.max) : ∀ g p : MvPolynomial σ R, p ∈ l →

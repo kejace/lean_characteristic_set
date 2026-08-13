@@ -94,8 +94,8 @@ theorem vanishingSet_diff_initialProd_subset
     (h : (∀ g ∈ PS, (0 : MvPolynomial σ R).IsSetRemainder g CS)) :
     vanishingSet K CS \ vanishingSet' K (initialProd CS.toFinset) ⊆
       vanishingSet K PS := by
-  refine Set.diff_subset_iff.mpr (fun x hx ↦ ?_)
-  simp only [vanishingSet, vanishingSet', Set.mem_setOf_eq, Set.mem_union] at *
+  refine Set.sdiff_subset_iff.mpr (fun x hx ↦ ?_)
+  simp only [vanishingSet, vanishingSet', Set.mem_ofPred_eq, Set.mem_union] at *
   simp only [or_iff_not_imp_right, not_forall, forall_exists_index, initialProd]
   intro p hp1 hp2
   rcases (h p hp1).2 with ⟨es, qs, h1, h2⟩
@@ -112,8 +112,8 @@ theorem vanishingSet_diff_initialProd_subset
 theorem vanishingSet_diff_initialProd_eq (h : CS.IsCharacteristicSet K PS) :
     vanishingSet K CS \ vanishingSet' K (initialProd CS.toFinset) =
       vanishingSet K PS \ vanishingSet' K (initialProd CS.toFinset) := by
-  refine Set.Subset.antisymm ?_ (Set.diff_subset_diff_left h.2)
-  refine Set.subset_diff.mpr ⟨?_ ,Set.disjoint_sdiff_left⟩
+  refine Set.Subset.antisymm ?_ (Set.sdiff_subset_sdiff_left h.2)
+  refine Set.subset_sdiff.mpr ⟨?_ ,Set.disjoint_sdiff_left⟩
   exact vanishingSet_diff_initialProd_subset K h.1
 
 /-- Well-Ordering Principle (3): `Zero(PS) = Zero(CS/IP) ∪ ⋃_{CS} Zero(PS ∪ {init(p)})` -/
@@ -124,7 +124,7 @@ theorem vanishingSet_decomposition (h : CS.IsCharacteristicSet K PS) : vanishing
       vanishingSet K PS ∩ vanishingSet' K (initialProd CS.toFinset) := Set.ext fun x ↦ by
     simp [vanishingSet, vanishingSet', initialProd, Finset.prod_eq_zero_iff]
   rw [vanishingSet_diff_initialProd_eq K h, this]
-  exact (Set.diff_union_inter _ _).symm
+  exact (Set.sdiff_union_inter _ _).symm
 
 end CharacteristicSet
 
@@ -196,7 +196,7 @@ variable (K : Type*) [CommSemiring K] [Algebra R K] (l₀ l : List (MvPolynomial
 
 lemma characteristicSetGo_vanishingSet_subset : vanishingSet K l₀ = vanishingSet K l →
     vanishingSet K l₀ ⊆ vanishingSet K (characteristicSet.go l₀ l) := by
-  simp only [vanishingSet, Set.setOf_subset_setOf]
+  simp only [vanishingSet, Set.ofPred_subset_ofPred]
   induction l using characteristicSet.go.induct l₀ with
   | case1 l BS lBS RS h =>
     intro hl x hx p hp
@@ -207,8 +207,8 @@ lemma characteristicSetGo_vanishingSet_subset : vanishingSet K l₀ = vanishingS
     intro hl
     rw [characteristicSet.go, if_neg h]
     refine ih (Set.ext fun x ↦ ?_)
-    simp only [Set.mem_setOf_eq, List.append_assoc, List.mem_append]
-    have hl := Set.mem_setOf_eq ▸ Set.mem_setOf_eq ▸ (Set.ext_iff.mp hl x)
+    simp only [Set.mem_ofPred_eq, List.append_assoc, List.mem_append]
+    have hl := Set.mem_ofPred_eq ▸ Set.mem_ofPred_eq ▸ (Set.ext_iff.mp hl x)
     refine ⟨fun hx p hp ↦ ?_, fun hx p hp ↦ hx _ (Or.inl hp)⟩
     refine Or.elim hp (hx _) fun hp ↦ ?_
     have hBS : ∀ ⦃q⦄, q ∈ BS → aeval x q = 0 := fun q hq ↦ (hl.mp hx) q <| l.basicSet_subset hq
@@ -344,7 +344,7 @@ theorem vanishingSet_eq_zeroDecomposition_union :
   suffices (x ∈ vanishingSet K l ∧ ∃ p ∈ CS, x ∈ vanishingSet' K p.initial) ↔
       ∃ p, (p ∈ CS ∧ ¬p.vars.max = ⊥) ∧ x ∈ vanishingSet K (p.initial :: (CS.toList ++ l)) by
     simpa using this
-  simp only [vanishingSet, Set.mem_setOf_eq, vanishingSet', List.mem_cons, List.mem_append,
+  simp only [vanishingSet, Set.mem_ofPred_eq, vanishingSet', List.mem_cons, List.mem_append,
     mem_toList_iff, forall_eq_or_imp]
   -- 4. Bidirectional implication
   refine ⟨fun ⟨hx, p, hp1, hp2⟩ ↦ ⟨p, ⟨hp1, ?_⟩, hp2, fun q hq ↦ ?_⟩,
@@ -356,7 +356,7 @@ theorem vanishingSet_eq_zeroDecomposition_union :
     rcases hq with hq | hq
     · -- x ∈ Zero(CS) because x ∈ Zero(l) and CS is characteristic
       have := (l.cs_isCharacteristicSet K).2
-      simp only [vanishingSet, Set.setOf_subset_setOf] at this
+      simp only [vanishingSet, Set.ofPred_subset_ofPred] at this
       exact this x hx q hq
     -- x ∈ Zero(l)
     exact hx q hq

@@ -53,9 +53,9 @@ theorem initialOf_def {p : MvPolynomial σ R} {i : σ} :
     (monomial s r).initialOf i = monomial (s.erase i) r := by
   by_cases r_zero : r = 0
   · simp only [r_zero, monomial_zero, initialOf_zero]
-  rw [initialOf_def, Finset.sum_filter, ← single_eq_monomial, degreeOf_eq_sup, support]
-  rw [Finsupp.support_single_ne_zero s r_zero, Finset.sum_singleton, Finset.sup_singleton]
-  rw [if_pos rfl, coeff, Finsupp.single_eq_same]
+  classical
+  rw [initialOf_def, degreeOf_monomial_eq s i r_zero, support_monomial, if_neg r_zero,
+    Finset.filter_singleton, if_pos rfl, Finset.sum_singleton, coeff_monomial, if_pos rfl]
 
 @[simp] theorem initialOf_C (r : R) : (C r : MvPolynomial σ R).initialOf i = C r := by
   rw [C_apply, initialOf_monomial, Finsupp.erase_zero]
@@ -181,12 +181,12 @@ theorem initialOf_eq_leadingCoeff [DecidableEq σ] {p : MvPolynomial σ R} {i : 
   simp only [rename_rename, ne_eq, Equiv.symm_comp_self, rename_id, AlgHom.coe_id, id_eq]
   have (n : ℕ) : (s'.optionElim n).mapDomain f.symm = s.update i n := by
     ext j
-    simp only [ne_eq, Finsupp.some, Finsupp.mapDomain_equiv_apply, Equiv.symm_symm,
+    simp only [ne_eq, Finsupp.mapDomain_equiv_apply, Equiv.symm_symm,
       Finsupp.optionElim_apply_eq_elim, Finsupp.update_apply, s', Option.elim]
     have : f i = none := Equiv.optionSubtypeNe_symm_self i
     split <;> expose_names
     · have : j ≠ i := fun hj ↦ by absurd heq; rw [hj, this]; exact not_eq_of_beq_eq_false rfl
-      rw [if_neg this, Finsupp.comapDomain_apply, ← heq, Finsupp.mapDomain_apply f.injective]
+      rw [if_neg this, Finsupp.some_apply, ← heq, Finsupp.mapDomain_apply f.injective]
     have : j = i := by apply f.injective; rw [this, heq]
     rw [if_pos this]
   exact this _ ▸ coeff_initialOf_eq_of_apply_eq_zero i p hs
@@ -446,7 +446,7 @@ theorem initial_monomial {s : σ →₀ ℕ} (r : R) {c : σ} :
 @[simp] theorem initial_X_pow (i : σ) {k : ℕ} (hk : k ≠ 0) :
     (X i ^ k).initial = (1 : MvPolynomial σ R) := by
   have : (Finsupp.single i k).support.max = i := by
-    rw [Finsupp.support_single_ne_zero _ hk]; exact rfl
+    rw [Finsupp.support_single _ hk]; exact rfl
   rw [X_pow_eq_monomial, initial_monomial 1 this, Finsupp.erase_single, monomial_zero', C_1]
 
 @[simp] theorem initial_X (i : σ) : (X i : MvPolynomial σ R).initial = 1 :=

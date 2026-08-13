@@ -187,26 +187,25 @@ theorem order_apply' {i : ℕ} (h : S.length ≤ i) : S.order i = ⊤ := if_neg 
 theorem order_lt_iff : S.order < T.order ↔ (∃ k < S.length, S k < T k ∧ ∀ i < k, S i ≈ T i) ∨
     (T.length < S.length ∧ ∀ i < T.length, S i ≈ T i) where
   mp h := by
-    rw [order_def, order_def, Pi.instLTLexForall] at h
-    simp only [Pi.Lex] at h
     rcases h with ⟨k, hk1, hk2⟩
-    have klts : k < S.length := Decidable.byContradiction fun h ↦ not_top_lt <| if_neg h ▸ hk2
-    rw [if_pos klts] at hk2
+    have klts : k < S.length := Decidable.byContradiction fun hc ↦
+      not_top_lt <| order_apply' (Nat.le_of_not_lt hc) ▸ hk2
+    rw [order_apply klts] at hk2
     by_cases kltt : k < T.length
-    · rw [if_pos kltt, WithTop.coe_lt_coe, ← MvPolynomial.lt_def'] at hk2
+    · rw [order_apply kltt, WithTop.coe_lt_coe, ← MvPolynomial.lt_def'] at hk2
       refine Or.inl ⟨k, klts, hk2, fun i hi ↦ ?_⟩
       have := hk1 i hi
-      rw [if_pos <| lt_trans hi klts, if_pos <| lt_trans hi kltt, WithTop.coe_eq_coe] at this
+      rw [order_apply <| lt_trans hi klts, order_apply <| lt_trans hi kltt,
+        WithTop.coe_eq_coe] at this
       exact MvPolynomial.equiv_def'.mpr this
     have tlek : T.length ≤ k := Nat.le_of_not_lt kltt
     have tlts : T.length < S.length := lt_of_le_of_lt tlek klts
     refine Or.inr ⟨tlts, fun i hi ↦ ?_⟩
     have := hk1 i <| lt_of_lt_of_le hi tlek
-    rw [if_pos (lt_trans hi tlts), if_pos hi, WithTop.coe_eq_coe] at this
+    rw [order_apply (lt_trans hi tlts), order_apply hi, WithTop.coe_eq_coe] at this
     exact MvPolynomial.equiv_def'.mpr this
   mpr h := by
-    rw [order_def, order_def, Pi.instLTLexForall]
-    simp only [Pi.Lex]
+    rw [order_def, order_def]
     rcases h with (⟨k, hk, hk1, hk2⟩ | ⟨hlen, heq⟩)
     · use k ⊓ T.length
       constructor
@@ -417,7 +416,7 @@ theorem wellFoundedLT_mvPolynomial_of_wellFoundedLT :
   use fun n ↦ single' (hf2 n)
   intro n
   refine lt_def.mpr <| Or.inl ⟨0, ?_⟩
-  simpa [length_single'] using hf1 n
+  simpa [length_single', single'_apply] using hf1 n
 
 theorem wellFoundedLT_variables_of_wellFoundedLT [Nontrivial R] :
     WellFoundedLT (TriangularSet σ R) → WellFoundedLT σ :=
@@ -463,18 +462,14 @@ private theorem _order_def [Fintype σ] : S._order = fun i ↦ S.order i.1 := rf
 
 private theorem _order_lt_iff [Fintype σ] : S._order < T._order ↔ S.order < T.order where
   mp h := by
-    rw [Pi.instLTLexForall] at h ⊢
     rw [_order_def, _order_def] at h
-    simp only [Pi.Lex] at h
     rcases h with ⟨k, hk1, hk2⟩
     have kn : k < Fintype.card σ + 1 := Decidable.byContradiction fun con ↦ by
       simp only [order_apply' <| le_trans length_le <| Nat.le_of_not_lt con] at hk2
       exact (lt_self_iff_false ⊤).mp hk2
     exact Exists.intro k.1 ⟨fun i hi ↦ hk1 ⟨i, lt_trans hi kn⟩ hi, hk2⟩
   mpr h := by
-    rw [Pi.instLTLexForall] at h ⊢
-    rw [_order_def, _order_def] at ⊢
-    simp only [Pi.Lex] at h
+    rw [_order_def, _order_def]
     rcases h with ⟨k, hk1, hk2⟩
     have kn : k < Fintype.card σ + 1 := Decidable.byContradiction fun con ↦ by
       simp only [order_apply' <| le_trans length_le <| Nat.le_of_not_lt con] at hk2

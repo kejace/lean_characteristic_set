@@ -172,7 +172,7 @@ theorem length_coe : S.length = S.val.length := rfl
 
 noncomputable instance : FunLike (AscendingSet σ R) ℕ (MvPolynomial σ R) where
   coe S := S.val
-  coe_injective' := DFunLike.coe_injective'.comp Subtype.coe_injective
+  coe_injective := DFunLike.coe_injective.comp Subtype.coe_injective
 
 @[ext]
 theorem ext (h : ∀ i, S i = T i) : S = T := DFunLike.ext _ _ h
@@ -182,7 +182,7 @@ theorem ext' (h1 : S.length = T.length) (h2 : ∀ i < S.length, S i = T i) : S =
 
 instance instSetLike : SetLike (AscendingSet σ R) (MvPolynomial σ R) where
   coe := fun S ↦ S.val
-  coe_injective' := SetLike.coe_injective'.comp Subtype.coe_injective
+  coe_injective := SetLike.coe_injective.comp Subtype.coe_injective
 
 theorem mem_def : p ∈ S ↔ p ∈ S.val := Iff.rfl
 
@@ -330,7 +330,7 @@ theorem _root_.TriangularSet.basicSet_toList_le_of_isAscendingSet {S : Triangula
     (hS : S.IsAscendingSet) : S.toList.basicSet ≤ S := by
   change S.toList.basicSet ≤ ⟨S, hS⟩
   apply S.toList.basicSet_minimal
-  simp only [mem_toList_iff, SetLike.setOf_mem_eq]
+  simp only [mem_toList_iff, SetLike.setOfPred_mem_eq]
   rfl
 
 end MvPolynomial.List

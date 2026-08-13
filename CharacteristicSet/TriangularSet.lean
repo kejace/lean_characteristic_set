@@ -47,7 +47,7 @@ def mk' {l : List (MvPolynomial σ R)} (hl1 : 0 ∉ l)
 
 noncomputable instance instFunLike : FunLike (TriangularSet σ R) ℕ (MvPolynomial σ R) where
   coe S n := S.toList[n]?.getD 0
-  coe_injective' := by
+  coe_injective := by
     rintro ⟨ls, hs1, hs2⟩ ⟨lt, ht1, ht2⟩ h
     congr
     apply List.ext_getElem? fun n ↦ ?_
@@ -190,17 +190,14 @@ theorem exists_index_max_vars_between_of_max_vars_first_lt
   have := this (S.length - 1) <| Nat.sub_le S.length 1
   exact (con this).2 rfl
 
-theorem toList_nodup (S : TriangularSet σ R) : S.toList.Nodup := by
-  refine List.nodup_iff_injective_getElem.mpr ?_
-  intro ⟨i, hi⟩ ⟨j, hj⟩ (h : S.toList[i] = S.toList[j])
-  rw [toList_getElem, toList_getElem] at h
-  exact (Fin.mk.injEq ..) ▸ index_eq_of_apply_eq hi hj h
+theorem toList_nodup (S : TriangularSet σ R) : S.toList.Nodup :=
+  S.toList_pairwise.imp fun h he ↦ absurd (he ▸ h) (lt_irrefl _)
 
 /-! ### Set-like behavior -/
 
 instance instSetLike : SetLike (TriangularSet σ R) (MvPolynomial σ R) where
   coe := fun S ↦ {p | ∃ n < S.length, S n = p}
-  coe_injective' := by
+  coe_injective := by
     intro S T (h : (fun p ↦ ∃ n < S.length, S n = p) = (fun p ↦ ∃ n < T.length, T n = p))
     have h (p : MvPolynomial σ R) : p ∈ S.toList ↔ p ∈ T.toList := by
       rw [mem_toList_iff', mem_toList_iff']
@@ -262,8 +259,13 @@ def toFinset (S : TriangularSet σ R) : Finset (MvPolynomial σ R) :=
   simp [toFinset]
 
 @[simp] theorem mem_toFinset_iff : p ∈ S.toFinset ↔ p ∈ S := by
-  refine Iff.trans ?_ SetLike.mem_coe
-  simp [toFinset, SetLike.coe, Fin.exists_iff, toList_getElem]
+  rw [← mem_toList_iff, List.mem_iff_getElem]
+  constructor
+  · intro hp
+    obtain ⟨i, -, hi⟩ := Finset.mem_map.mp hp
+    exact ⟨i, i.isLt, hi⟩
+  · rintro ⟨i, hi, rfl⟩
+    exact Finset.mem_map.mpr ⟨⟨i, hi⟩, Finset.mem_univ _, rfl⟩
 
 @[simp] theorem toFinset_eq_iff_eq : S.toFinset = T.toFinset ↔ S = T := by
   refine ⟨fun h ↦ SetLike.ext fun p ↦ ?_, congrArg _⟩
@@ -273,13 +275,18 @@ def toFinset (S : TriangularSet σ R) : Finset (MvPolynomial σ R) :=
 theorem toFinset_eq_coe_set (S : TriangularSet σ R) : S.toFinset = (S : Set (MvPolynomial σ R)) :=
   Set.ext fun _ ↦ ⟨SetLike.mem_coe.mpr ∘ mem_toFinset_iff.mp, mem_toFinset_iff.mpr⟩
 
+theorem toFinset_subset_toFinset (h : S ⊆ T) : S.toFinset ⊆ T.toFinset :=
+  fun _ hp ↦ mem_toFinset_iff.mpr (h (mem_toFinset_iff.mp hp))
+
 theorem length_le_of_subset : S ⊆ T → S.length ≤ T.length := fun h ↦ by
   rw [← card_toFinset, ← card_toFinset]
-  exact Finset.card_le_card <| Finset.coe_subset.mp (by simpa [toFinset_eq_coe_set] using h)
+  exact Finset.card_le_card (toFinset_subset_toFinset h)
 
 theorem length_lt_of_ssubset : S ⊂ T → S.length < T.length := fun h ↦ by
   rw [← card_toFinset, ← card_toFinset]
-  exact Finset.card_lt_card <| Finset.coe_ssubset.mp (by simpa [toFinset_eq_coe_set] using h)
+  refine Finset.card_lt_card (lt_of_le_of_ne (toFinset_subset_toFinset h.1) fun he ↦ h.2 ?_)
+  rw [toFinset_eq_iff_eq.mp he]
+  exact Subset.refl T
 
 
 
@@ -453,7 +460,8 @@ theorem mem_concat_iff {p q : MvPolynomial σ R} (h : S.CanConcat p) :
 
 theorem coe_concat_eq_insert {p : MvPolynomial σ R} (h : S.CanConcat p) :
     S.concat p = (S : Set (MvPolynomial σ R)).insert p := Set.ext fun q ↦ by
-  simpa using mem_concat_iff h
+  simp only [SetLike.mem_coe]
+  exact mem_concat_iff h
 
 variable [DecidableEq R] {S T : TriangularSet σ R} {p q : MvPolynomial σ R}
 
