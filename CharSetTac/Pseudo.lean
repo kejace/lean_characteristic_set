@@ -112,13 +112,19 @@ def sub (a b : Tracked) : Tracked :=
 /-- Pseudo-divide a tracked `g` by a tracked `f`, carrying cofactors through.
 
 From `init(f)^s * g = q * f + r` we get `r = init(f)^s * g - q * f`, so the remainder's
-cofactors are `init(f)^s * cof(g) - q * cof(f)`. -/
+cofactors are `init(f)^s * cof(g) - q * cof(f)`.
+
+The polynomial part comes from `Wu.prem`, which has already computed it. Combining the
+cofactors through the full `Tracked` operations instead would recompute
+`init(f)^s * g.poly` and `q * f.poly` — two of the largest multiplications in the
+engine — only to discard both in favour of `res.remainder`. -/
 def prem (g f : Tracked) : Nat × Poly × Tracked :=
   let res := Wu.prem g.poly f.poly
-  let I := f.poly.initial
-  let Ipow := Poly.pow I res.exponent
-  let r : Tracked := sub (scale Ipow g) (scale res.quotient f)
-  (res.exponent, res.quotient, { r with poly := res.remainder })
+  let Ipow := Poly.pow f.poly.initial res.exponent
+  let cof := (Array.range (max g.cof.size f.cof.size)).map fun j =>
+    Poly.sub (Poly.mul Ipow (g.cof.getD j Poly.zero))
+      (Poly.mul res.quotient (f.cof.getD j Poly.zero))
+  (res.exponent, res.quotient, { poly := res.remainder, cof := cof })
 
 end Tracked
 

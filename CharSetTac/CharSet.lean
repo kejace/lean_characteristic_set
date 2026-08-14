@@ -93,13 +93,16 @@ partial def charSet (mode : Mode) (ps : Array Tracked) (fuel : Nat := 50) : Arra
 
 `mult * g = poly + ∑ⱼ cof[j] * hⱼ`. -/
 structure Reduction where
-  /-- Accumulated multiplier applied to the conclusion. -/
-  mult : Poly
   /-- Current remainder. -/
   poly : Poly
   /-- Cofactors against the original hypotheses. -/
   cof : Array Poly
-  /-- The `(initial, exponent)` pairs multiplied in so far, for nondegeneracy goals. -/
+  /-- The `(initial, exponent)` pairs multiplied in so far, for nondegeneracy goals.
+
+  The multiplier itself is **not** carried here. It is exactly `∏ (I ^ e)` over these
+  pairs, so maintaining it through the loop means re-multiplying an ever-growing product
+  at every step — the largest single cost in the engine, for a value no caller needs until
+  the end. `Certificate.mult` reconstitutes it once, in `solve`. -/
   factors : Array (Poly × Nat)
   deriving Inhabited
 
@@ -107,18 +110,18 @@ namespace Reduction
 
 /-- Start reducing `g`: `1 * g = g + ∑ 0 * hⱼ`. -/
 def start (n : Nat) (g : Poly) : Reduction :=
-  { mult := Poly.const 1, poly := g, cof := Array.replicate n Poly.zero, factors := #[] }
+  { poly := g, cof := Array.replicate n Poly.zero, factors := #[] }
 
 /-- Pseudo-divide the current remainder by `f`, maintaining the invariant.
 
 With `init(f)^s * poly = q * f + r` and `f = ∑ⱼ Cf[j] * hⱼ`:
-`mult' = init(f)^s * mult`, `cof'[j] = init(f)^s * cof[j] + q * Cf[j]`, `poly' = r`. -/
+`cof'[j] = init(f)^s * cof[j] + q * Cf[j]`, `poly' = r`, and `init(f)^s` joins the
+factors. -/
 def step (red : Reduction) (f : Tracked) : Reduction :=
   let res := Wu.prem red.poly f.poly
   let I := f.poly.initial
   let Ipow := Poly.pow I res.exponent
-  { mult := Poly.mul Ipow red.mult
-    poly := res.remainder
+  { poly := res.remainder
     cof := (Array.range (max red.cof.size f.cof.size)).map fun j =>
       Poly.add (Poly.mul Ipow (red.cof.getD j Poly.zero))
         (Poly.mul res.quotient (f.cof.getD j Poly.zero))
@@ -144,6 +147,38 @@ structure Certificate where
   charSet : Array Poly
   deriving Inhabited
 
+/-- **Cancel factors shared by the multiplier and every cofactor.**
+
+Pseudo-division multiplies the whole reduction state by `init(f)^s` at every step, and much
+of that is later cancelled by the arithmetic rather than by the bookkeeping — so the raw
+certificate routinely carries initials that divide out exactly. Removing them shrinks the
+`linear_combination` that Lean has to check, which is the dominant cost on hard problems
+once the engine itself is fast.
+
+It also **removes nondegeneracy side goals**: a factor cancelled to exponent zero is no
+longer part of the multiplier, so the user is never asked to prove it nonzero. That is why
+the conditions `wu` reports are often stronger than the theorem needs — this is the fix.
+
+Soundness needs no argument beyond polynomial algebra. `ℚ[x]` is a domain and each `I` is
+the initial of a nonzero polynomial, so `I * (M' * g - ∑ d'ⱼ hⱼ) = 0` gives
+`M' * g = ∑ d'ⱼ hⱼ` as an identity of polynomials. The oracle is untrusted regardless: if
+this pass ever produced a false identity, `ring1` would reject it and the tactic would
+fail. -/
+def Certificate.cancelCommonFactors (c : Certificate) : Certificate := Id.run do
+  let mut factors : Array (Poly × Nat) := #[]
+  let mut cofs := c.cofactors
+  for (I, e) in c.factors do
+    let mut left := e
+    for _ in [0:e] do
+      match cofs.mapM (fun d => Poly.divExact d I) with
+      | some cofs' => cofs := cofs'; left := left - 1
+      | none => break
+    if left > 0 then factors := factors.push (I, left)
+  return { c with
+    factors := factors
+    cofactors := cofs
+    mult := factors.foldl (init := Poly.const 1) fun acc (I, e) => Poly.mul acc (Poly.pow I e) }
+
 /-- Run Wu's method on hypotheses `hs` and conclusion `g`.
 
 Returns a certificate when `g` pseudo-reduces to zero modulo the characteristic set, and
@@ -156,9 +191,11 @@ def solve (mode : Mode) (hs : Array Poly) (g : Poly) : Option Certificate :=
   let red := (Reduction.start n g).run cs
   if !red.poly.isZero then none
   else
-    some { mult := red.mult
-           factors := red.factors
-           cofactors := red.cof
-           charSet := cs.map (·.poly) }
+    some <| Certificate.cancelCommonFactors
+      { mult := red.factors.foldl (init := Poly.const 1) fun acc (I, e) =>
+          Poly.mul acc (Poly.pow I e)
+        factors := red.factors
+        cofactors := red.cof
+        charSet := cs.map (·.poly) }
 
 end Wu

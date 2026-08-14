@@ -64,12 +64,39 @@ coordinates is what makes the discrete evolute a rational map. -/
 
 /-! ### Projective incidence -/
 
--- **Desargues' theorem is NOT proved here.** With ten free points (twenty coordinates) the
--- characteristic set computation exceeded a four-million-heartbeat budget, and unlike
--- Simson no variable order I tried brought it back into range. Recorded rather than
--- omitted: it is a genuine limit of the current engine on this configuration, and the
--- natural fix is a projective (homogeneous) formulation with fewer free parameters rather
--- than more compute.
+-- **Desargues' theorem.** Two triangles `ABC` and `A'B'C'` perspective from a point: the
+-- three intersections of corresponding sides are collinear.
+--
+-- This was previously recorded here as *not* proved — with ten free points (twenty
+-- coordinates) the computation blew a four-million-heartbeat budget. What fixed it was not
+-- more compute but a better formulation, in two steps.
+--
+-- First, **parametrise the perspectivity**: `A' = tA · A` rather than "A' is a free point
+-- collinear with O and A". That trades three hypotheses and six coordinates for three
+-- scalars. Second, put the centre of perspectivity at the **origin**, which costs no
+-- generality because collinearity is translation-invariant. Together these take the system
+-- from 20 variables and 9 hypotheses to 15 and 6, which is the difference between
+-- intractable and forty seconds.
+--
+-- The three nondegeneracy conditions are exactly the ones the theorem needs, and they are
+-- worth reading. Each factors as `(tX - tY) * (X.1 * Y.2 - X.2 * Y.1) ≠ 0`: the second
+-- factor says `O`, `X`, `Y` are not collinear — the triangle is a genuine triangle — and
+-- the first says the corresponding sides are not parallel, so they actually meet at a
+-- finite point rather than at infinity. Desargues is false without both, and it is a good
+-- sign that the method recovers them rather than something stronger.
+set_option maxRecDepth 8000 in
+#wu_bench theorem desargues (A B C P Q R : Pt) (tA tB tC : ℝ)
+    (hAB : (tB - tA) * (A.1 * B.2 - A.2 * B.1) ≠ 0)
+    (hBC : (tC - tB) * (B.1 * C.2 - B.2 * C.1) ≠ 0)
+    (hCA : (tC - tA) * (A.1 * C.2 - A.2 * C.1) ≠ 0)
+    (hP  : Collinear₃ A B P)
+    (hP' : Collinear₃ (homothety tA A) (homothety tB B) P)
+    (hQ  : Collinear₃ B C Q)
+    (hQ' : Collinear₃ (homothety tB B) (homothety tC C) Q)
+    (hR  : Collinear₃ C A R)
+    (hR' : Collinear₃ (homothety tC C) (homothety tA A) R) :
+    Collinear₃ P Q R := by
+  wu (vars := [A.1, A.2, B.1, B.2, C.1, C.2, tA, tB, tC, P.1, P.2, Q.1, Q.2, R.1, R.2])
 
 -- Collinearity is preserved by the affine cross-ratio construction: if `X` divides `AB`
 -- in ratio `t` and `Y` divides `CD` in the same ratio, then the construction is compatible

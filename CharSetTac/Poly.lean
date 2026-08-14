@@ -60,9 +60,29 @@ def single (i e : Nat) : Mon :=
 /-- Total degree. -/
 def degree (m : Mon) : Nat := m.foldl (· + ·) 0
 
-/-- Product of monomials: pointwise addition of exponents. -/
+/-- Product of monomials: pointwise addition of exponents.
+
+**No `trim` is needed.** If `a` and `b` are trimmed then so is the product: at the top
+index `n - 1` where `n = max a.size b.size`, whichever operand attains that size has a
+nonzero exponent there, and adding the other operand's (possibly zero) exponent keeps it
+nonzero. Since this is the innermost loop of every polynomial multiplication, skipping the
+scan matters. -/
 def mul (a b : Mon) : Mon :=
-  trim <| (Array.range (max a.size b.size)).map fun i => a.getD i 0 + b.getD i 0
+  if a.isEmpty then b
+  else if b.isEmpty then a
+  else Id.run do
+    let n := max a.size b.size
+    let mut out := Array.mkEmpty n
+    for i in [0:n] do
+      out := out.push (a.getD i 0 + b.getD i 0)
+    return out
+
+/-- `a / b`, when every exponent of `b` is at most the corresponding one of `a`. -/
+def div? (a b : Mon) : Option Mon :=
+  let n := max a.size b.size
+  if (List.range n).all fun i => b.getD i 0 ≤ a.getD i 0 then
+    some (trim <| (Array.range n).map fun i => a.getD i 0 - b.getD i 0)
+  else none
 
 /-- Set the exponent of variable `i` to `e`. -/
 def setExp (m : Mon) (i e : Nat) : Mon :=
@@ -127,29 +147,104 @@ def var (i : Nat) : Poly := #[{ coeff := 1, mon := Mon.single i 1 }]
 
 /-- Scale by a rational. -/
 def smul (c : Rat) (p : Poly) : Poly :=
-  if c == 0 then zero else p.map fun t => { t with coeff := c * t.coeff }
+  if c == 0 then zero
+  else if c == 1 then p
+  else p.map fun t => { t with coeff := c * t.coeff }
 
 /-- Negation. -/
-def neg (p : Poly) : Poly := smul (-1) p
+def neg (p : Poly) : Poly := p.map fun t => { t with coeff := -t.coeff }
 
-/-- Addition. -/
-def add (p q : Poly) : Poly := ofTerms (p ++ q)
+/-- Merge two sorted term arrays, combining equal monomials and dropping cancellations.
+
+`fuel` is `p.size + q.size`, which is ample: every step consumes at least one input term. -/
+private def mergeAux : Nat → Array Term → Nat → Nat → Poly → Poly → Array Term
+  | 0, out, _, _, _, _ => out
+  | fuel + 1, out, i, j, p, q =>
+    if i ≥ p.size then out ++ q.extract j q.size
+    else if j ≥ q.size then out ++ p.extract i p.size
+    else
+      let a := p[i]!
+      let b := q[j]!
+      match Mon.cmp a.mon b.mon with
+      | .gt => mergeAux fuel (out.push a) (i + 1) j p q
+      | .lt => mergeAux fuel (out.push b) i (j + 1) p q
+      | .eq =>
+        let c := a.coeff + b.coeff
+        let out := if c == 0 then out else out.push { coeff := c, mon := a.mon }
+        mergeAux fuel out (i + 1) (j + 1) p q
+
+/-- Addition, by linear merge.
+
+Both operands are already sorted, so this is `O(n + m)`. The earlier implementation went
+through `ofTerms`, re-sorting the concatenation on every addition — and a descending array
+concatenated with another descending array is precisely the input a quicksort handles
+worst. Addition is the single most executed operation in the engine, so this is the
+difference between a benchmark that finishes and one that does not. -/
+def add (p q : Poly) : Poly :=
+  if p.isEmpty then q
+  else if q.isEmpty then p
+  else mergeAux (p.size + q.size) (Array.mkEmpty (p.size + q.size)) 0 0 p q
 
 /-- Subtraction. -/
-def sub (p q : Poly) : Poly := add p (neg q)
+def sub (p q : Poly) : Poly :=
+  if q.isEmpty then p else if p.isEmpty then neg q else add p (neg q)
 
-/-- Multiplication. -/
-def mul (p q : Poly) : Poly := Id.run do
-  let mut ts : Array Term := #[]
-  for a in p do
-    for b in q do
-      ts := ts.push { coeff := a.coeff * b.coeff, mon := Mon.mul a.mon b.mon }
-  return ofTerms ts
+/-- Multiplication by a single term. Multiplying every monomial by a fixed monomial adds
+the same exponent vector everywhere, which `Mon.cmp` preserves — so the result is already
+sorted and no normalisation pass is needed. -/
+private def mulTerm (p : Poly) (c : Rat) (m : Mon) : Poly :=
+  if c == 0 then zero
+  else p.map fun t => { coeff := c * t.coeff, mon := Mon.mul t.mon m }
+
+/-- Multiplication.
+
+The single-term fast path is not a micro-optimisation: pseudo-division multiplies by
+`x_i ^ (e - d)` and by initials on every iteration, and those are very often one term. -/
+def mul (p q : Poly) : Poly :=
+  if p.isEmpty || q.isEmpty then zero
+  else if h : q.size = 1 then mulTerm p (q[0]'(by omega)).coeff (q[0]'(by omega)).mon
+  else if h : p.size = 1 then mulTerm q (p[0]'(by omega)).coeff (p[0]'(by omega)).mon
+  else Id.run do
+    -- Distribute over the smaller operand and merge, keeping every intermediate sorted.
+    -- Accumulating into one array and sorting at the end costs `O(nm log nm)`; merging
+    -- term-by-term costs `O(nm)` and, more importantly, cancels as it goes rather than
+    -- carrying cancelling terms through the sort.
+    let mut acc : Poly := zero
+    for a in p do
+      acc := add acc (mulTerm q a.coeff a.mon)
+    return acc
 
 /-- `p ^ n`. -/
 def pow (p : Poly) : Nat → Poly
   | 0 => const 1
   | n + 1 => mul p (pow p n)
+
+/-- **Exact division.** `divExact p q = some r` exactly when `p = q * r`; `none` when `q`
+does not divide `p`.
+
+Standard leading-term cancellation. `Mon.cmp` is a monomial order compatible with
+multiplication (multiplying both operands by a fixed monomial shifts every exponent
+equally, so the comparison is unchanged), which is what makes the leading term of `q * r`
+equal to the product of the leading terms and so makes this algorithm correct.
+
+`fuel` runs out only on inputs far larger than anything the engine produces; exhaustion
+returns `none`, which callers treat as "not divisible" — a missed simplification, never a
+wrong answer. -/
+def divExact (p q : Poly) : Option Poly :=
+  if q.isEmpty then none
+  else
+    let rec go (fuel : Nat) (p : Poly) (acc : Array Term) : Option Poly :=
+      match fuel with
+      | 0 => none
+      | fuel + 1 =>
+        if h : p.size = 0 then some acc
+        else
+          match Mon.div? (p[0]'(by omega)).mon q[0]!.mon with
+          | none => none
+          | some m =>
+            let c := (p[0]'(by omega)).coeff / q[0]!.coeff
+            go fuel (sub p (mulTerm q c m)) (acc.push { coeff := c, mon := m })
+    go 20000 p #[]
 
 /-- The main variable: the largest variable index occurring in `p`.
 
