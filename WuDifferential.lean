@@ -10,3 +10,6 @@ import WuDifferential.Manifold
 import WuDifferential.Surface
 import WuDifferential.SurfaceChristoffel
 import WuDifferential.SurfaceComparison
+import WuDifferential.SurfaceGauss
+import WuDifferential.SurfaceGaussWu
+import WuDifferential.SurfaceGaussComparison
