@@ -1,7 +1,7 @@
 name = "CharacteristicSet"
 version = "0.1.0"
 keywords = ["math"]
-defaultTargets = ["CharacteristicSet", "CharSetTac", "WuGeometry"]
+defaultTargets = ["CharacteristicSet", "CharSetTac", "WuGeometry", "WuDifferential"]
 [[lean_lib]]
 name = "CharacteristicSet"
 
@@ -10,6 +10,9 @@ name = "CharSetTac"
 
 [[lean_lib]]
 name = "WuGeometry"
+
+[[lean_lib]]
+name = "WuDifferential"
 
 [leanOptions]
 pp.unicode.fun = true # pretty-prints `fun a ↦ b`
