@@ -392,7 +392,7 @@ usually stated*. The correct statement (Barakat–De Sole–Kac, Prop. 1.5) is
 with the `R` summand genuinely there: a constant is variationally trivial, but it is not a
 total derivative, because every `D f` has zero constant term. Geometrically one has
 `1 = D_x(x)` and the summand disappears — but `ℚ{y}` has no `x`, which is exactly the gap
-`CharSetTac/JetContact.lean` fills.
+`WuDifferential/JetContact.lean` fills.
 
 This matters practically: Olver–Shakiban's *A resolution of the Euler operator I* (Proc. AMS
 69 (1978) 223–229) prints the complex `0 → R → R{u} → R{u} → …` as exact, and at the

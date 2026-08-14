@@ -15,3 +15,6 @@ import WuDifferential.SurfaceGaussWu
 import WuDifferential.SurfaceGaussComparison
 import WuDifferential.SurfaceCodim2
 import WuDifferential.SurfaceRicci
+import WuDifferential.Variational
+import WuDifferential.JetContact
+import WuDifferential.Conservation

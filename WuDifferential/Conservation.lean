@@ -2,12 +2,12 @@
 Copyright (c) 2026 Wu tactic contributors. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 -/
-import CharSetTac.Variational
+import WuDifferential.Variational
 
 /-!
 # Evolution equations and conservation laws
 
-`CharSetTac/Variational.lean` builds `E` and `Functionals = ℚ{y}/im D`. This file puts them to
+`WuDifferential/Variational.lean` builds `E` and `Functionals = ℚ{y}/im D`. This file puts them to
 work on named PDEs: KdV, Burgers, the heat equation.
 
 ## The trick that makes one derivation enough

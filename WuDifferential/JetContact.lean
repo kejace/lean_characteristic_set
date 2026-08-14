@@ -197,6 +197,160 @@ theorem dd_sub_Dtot_smul_mem_contact (f : JetPoly R σ) :
     Submodule.Quotient.eq] at h
   exact h
 
+/-! ### The bicomplex at the bottom corner: `d = d_H + d_V`
+
+The variational bicomplex splits forms by *horizontal* degree (along the base) and *vertical*
+degree (along the fibre), and splits `d` accordingly. On functions — the `(0,0)` corner — the
+whole content is:
+
+```
+  d_H f = (D f) dx          d_V f = d f − d_H f          d = d_H + d_V
+```
+
+and the two are pinned down by what they do to coordinates: `d_H` sees only the base, `d_V`
+**kills the independent variable and sends `y^(k)` to the contact form `θ_{i,k}`**. That last
+fact is the reason contact forms are the vertical directions. -/
+
+section Bicomplex
+
+/-- **The horizontal differential** `d_H f = (D f) dx`. -/
+noncomputable def dH : Derivation R (JetPoly R σ) (Form R σ) :=
+  (LinearMap.toSpanSingleton (JetPoly R σ) _ (dCoord R σ .base)).compDer (Dtot R σ)
+
+/-- **The vertical differential**, defined as the rest of `d`. -/
+noncomputable def dV : Derivation R (JetPoly R σ) (Form R σ) := dd R σ - dH R σ
+
+/-- **`d = d_H + d_V`.** True by construction, and recorded because it is the statement the
+bigrading exists to make. -/
+theorem dd_eq_dH_add_dV : dd R σ = dH R σ + dV R σ := by
+  rw [dV, add_sub_cancel]
+
+variable {R σ}
+
+@[simp] theorem dH_apply (f : JetPoly R σ) : dH R σ f = Dtot R σ f • dCoord R σ .base := rfl
+
+@[simp] theorem dV_apply (f : JetPoly R σ) :
+    dV R σ f = dd R σ f - Dtot R σ f • dCoord R σ .base := rfl
+
+/-- `d_H x = dx`. -/
+theorem dH_xx : dH R σ (xx R σ) = dCoord R σ .base := by simp [xx]
+
+/-- `d_H y^(k) = y^(k+1) dx` — the horizontal differential replaces a jet coordinate by the
+next one, which is the total derivative doing its job. -/
+theorem dH_yy (i : σ) (k : ℕ) :
+    dH R σ (yy R σ i k) = yy R σ i (k + 1) • dCoord R σ .base := by simp [yy]
+
+/-- **`d_V x = 0`** — the vertical differential annihilates the independent variable. -/
+theorem dV_xx : dV R σ (xx R σ) = 0 := by simp [xx]
+
+/-- **`d_V y^(k) = θ_{i,k}`** — and produces exactly the contact forms.
+
+Together with `dV_xx` this characterises `d_V` completely, and it is the precise sense in
+which "contact form" and "vertical direction" are the same notion. -/
+theorem dV_yy (i : σ) (k : ℕ) : dV R σ (yy R σ i k) = theta R σ i k := by
+  simp [yy, theta]
+
+/-- The vertical differential lands in the contact submodule, for every function — not just
+on generators. This is `dd_sub_Dtot_smul_mem_contact` restated in bicomplex language. -/
+theorem dV_mem_contact (f : JetPoly R σ) : dV R σ f ∈ contactSubmodule R σ :=
+  dd_sub_Dtot_smul_mem_contact R σ f
+
+end Bicomplex
+
+/-! ### Jets of an actual function
+
+Everything above is formal. This section evaluates it: a function `f` has a **prolongation**,
+the jet coordinates going to its successive derivatives, and the defining property of that
+prolongation is that it is **holonomic** — `d/dx` of the `k`-th coordinate is the `(k+1)`-st.
+
+Holonomy is exactly "the contact forms vanish along the section": `θ_{i,k} = dy^(k) −
+y^(k+1) dx` annihilates a section precisely when `d(y^(k)∘s) = (y^(k+1)∘s) dx`, and that is
+`prolong_deriv` below. -/
+
+section Prolongation
+
+/-- The target: `ℚ[x]` with `d/dx`, which Mathlib already gives as a `Derivation`. -/
+abbrev Base : Type := MvPolynomial Unit ℚ
+
+/-- `d/dx` on the base. -/
+noncomputable abbrev dx : Derivation ℚ Base Base := pderiv ()
+
+/-- **The prolongation of `f`**: the substitution sending `x ↦ x` and `y^(k) ↦ f^(k)`. -/
+noncomputable def prolong (f : Base) : JetPoly ℚ Unit →ₐ[ℚ] Base :=
+  aeval fun v => match v with
+    | .base => X ()
+    | .jet _ k => (dx : Base → Base)^[k] f
+
+@[simp] theorem prolong_xx (f : Base) : prolong f (xx ℚ Unit) = X () := by
+  simp [prolong, xx]
+
+@[simp] theorem prolong_yy (f : Base) (k : ℕ) :
+    prolong f (yy ℚ Unit () k) = (dx : Base → Base)^[k] f := by
+  simp [prolong, yy]
+
+/-- On a coordinate, prolonging then differentiating agrees with differentiating then
+prolonging. The `base` case is `d/dx (x) = 1`; the `jet` case is one unfolding of the
+iterate. -/
+private theorem prolong_deriv_X (f : Base) (v : JetVar Unit) :
+    prolong f (Dtot ℚ Unit (X v)) = dx (prolong f (X v)) := by
+  cases v with
+  | base => simp [prolong]
+  | jet i k =>
+      simp only [Dtot_X_jet, prolong, aeval_X]
+      rw [Function.iterate_succ_apply' (f := (dx : Base → Base))]
+
+/-- **The prolongation is holonomic**: it intertwines the total derivative with `d/dx`.
+
+This is the whole point of the jet ring. `D` was *defined* formally by `x ↦ 1`,
+`y^(k) ↦ y^(k+1)`; this says that under any actual substitution `y ↦ f`, that formal rule
+computes the genuine derivative. Equivalently: the contact forms vanish along the section. -/
+theorem prolong_deriv (f : Base) (p : JetPoly ℚ Unit) :
+    prolong f (Dtot ℚ Unit p) = dx (prolong f p) := by
+  induction p using MvPolynomial.induction_on with
+  | C r => simp [prolong]
+  | add p q hp hq => simp [hp, hq]
+  | mul_X p v hp =>
+      have hL : prolong f (Dtot ℚ Unit (p * X v))
+          = prolong f p * prolong f (Dtot ℚ Unit (X v))
+            + prolong f (X v) * prolong f (Dtot ℚ Unit p) := by
+        rw [Derivation.leibniz]
+        simp only [smul_eq_mul, map_add, map_mul]
+      have hR : dx (prolong f (p * X v))
+          = prolong f p * dx (prolong f (X v))
+            + prolong f (X v) * dx (prolong f p) := by
+        rw [map_mul, Derivation.leibniz]
+        simp only [smul_eq_mul]
+      rw [hL, hR, hp, prolong_deriv_X]
+
+/-! #### A concrete jet: `y = x²` -/
+
+/-- The prolongation of `x²`. -/
+noncomputable abbrev sq : Base := X () ^ 2
+
+example : prolong sq (yy ℚ Unit () 0) = X () ^ 2 := by simp
+
+example : prolong sq (yy ℚ Unit () 1) = 2 * X () := by
+  simp [Derivation.leibniz_pow]
+
+example : prolong sq (yy ℚ Unit () 2) = 2 := by
+  simp [Function.iterate_succ_apply', Derivation.leibniz_pow]
+
+example : prolong sq (yy ℚ Unit () 3) = 0 := by
+  simp [Function.iterate_succ_apply', Derivation.leibniz_pow]
+
+/-- **`y = x²` solves `y'' = 2`** — the equation is a differential polynomial, the solution is
+a substitution, and being a solution is the substitution killing it. -/
+example : prolong sq (yy ℚ Unit () 2 - 2) = 0 := by
+  simp [Function.iterate_succ_apply', Derivation.leibniz_pow, map_ofNat]
+
+/-- …and therefore kills every differential consequence too, by holonomy: `y''' = 0` comes
+for free from `y'' = 2` by pushing `D` across the substitution. -/
+example : prolong sq (Dtot ℚ Unit (yy ℚ Unit () 2 - 2)) = 0 := by
+  rw [prolong_deriv]
+  simp [Function.iterate_succ_apply', Derivation.leibniz_pow, map_ofNat]
+
+end Prolongation
+
 /-! ### What the independent variable buys
 
 Every statement here mentions `x` essentially, and none of them can even be *written* in

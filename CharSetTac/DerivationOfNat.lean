@@ -24,7 +24,7 @@ set: the equation for `D v` stops being linear in the derivative and the goal st
 The failure is invisible from outside — the tactic merely reports that the goal does not
 follow.
 
-It bit a second time in `CharSetTac/Variational.lean`, where `D 2` survived inside an
+It bit a second time in `WuDifferential/Variational.lean`, where `D 2` survived inside an
 Euler–Lagrange computation.
 
 Its own file because it is bound for Mathlib — see `MATHLIBABLE_REPORT.md`, candidate 3.
