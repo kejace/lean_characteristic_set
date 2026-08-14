@@ -18,3 +18,4 @@ import CharSetTac.Diff.Test
 import CharSetTac.Diff.TestMulti
 import CharSetTac.Test
 import CharSetTac.TestTactic
+import CharSetTac.TestDecomp

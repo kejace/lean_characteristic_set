@@ -225,10 +225,33 @@ def preprocess : TacticM Unit := do
   evalTactic (← `(tactic| try simp only [wu_unfold] at *))
   splitConjunctions
 
-/-- The core of the tactic. With `suggest`, also print a self-contained pasteable proof. -/
-def wuCore (cfg : Config) (ref : Syntax) (suggest : Bool) : TacticM Unit := withMainContext do
-  preprocess
-  withMainContext do
+/-- Everything the emitter needs: the reflected goal, the atoms, and the certificate in
+integral form.
+
+Split out from `wuCore` so that the decomposition tactic can ask *which* nondegeneracy
+factors a goal produces without also committing to a proof. -/
+structure Analysis where
+  /-- The ambient ring. -/
+  R : Expr
+  /-- Left-hand side of the goal. -/
+  lhs : Expr
+  /-- Right-hand side of the goal. -/
+  rhs : Expr
+  /-- Reflection atoms, shared between hypotheses and goal. -/
+  atoms : Array Expr
+  /-- The hypotheses that were used. -/
+  hs : Array HypInfo
+  /-- Integer scale factored out of the certificate. -/
+  scale : Nat
+  /-- Nondegeneracy factors, each of which must be nonzero. -/
+  factors : Array (Poly × Nat)
+  /-- Cofactors against the hypotheses. -/
+  cofs : Array Poly
+  /-- The characteristic set, for tracing. -/
+  charSet : Array Poly
+
+/-- Reflect the goal and run the engine, stopping short of emitting any proof. -/
+def wuAnalyze (cfg : Config) : TacticM Analysis := withMainContext do
   let goal ← getMainGoal
   -- `.consumeMData` matters: tactics such as `simp` and `have` leave `mdata`
   -- wrappers, which pretty-print transparently but are not applications, so `Expr.eq?`
@@ -264,6 +287,15 @@ def wuCore (cfg : Config) (ref : Syntax) (suggest : Bool) : TacticM Unit := with
         for the stronger reduction, `wu (algo := ritt)`."
   trace[wu] "characteristic set: {cert.charSet.map (·.toString)}"
   let (scale, factors, cofs) := cert.integralForm
+  return { R, lhs, rhs, atoms, hs, scale, factors, cofs, charSet := cert.charSet }
+
+/-- The core of the tactic. With `suggest`, also print a self-contained pasteable proof. -/
+def wuCore (cfg : Config) (ref : Syntax) (suggest : Bool) : TacticM Unit := withMainContext do
+  preprocess
+  withMainContext do
+  let a ← wuAnalyze cfg
+  let R := a.R; let lhs := a.lhs; let rhs := a.rhs; let atoms := a.atoms
+  let hs := a.hs; let scale := a.scale; let factors := a.factors; let cofs := a.cofs
   let M ← mkMultExpr R atoms scale factors
   let Mstx ← Term.exprToSyntax M
   let lhsStx ← Term.exprToSyntax lhs
@@ -421,10 +453,101 @@ def mkConfig (algo : Option Syntax.Ident) (vs : Option (Syntax.TSepArray `term "
     cfg := { cfg with hyps := some fvs }
   return cfg
 
+/-! ### Zero decomposition
+
+`wu` proves a goal on the *generic* component and hands back the degenerate cases as side
+goals: every `I ≠ 0` it reports is a component it declined to visit. That is the right
+default — geometry theorems are generic statements — but it means `wu` cannot prove a
+theorem that happens to hold everywhere, including where the initials vanish.
+
+`wu!` visits them. On an undischargeable `I ≠ 0` it splits `by_cases I = 0` and recurses:
+in the nonzero branch the condition is now available, and in the zero branch the extra
+equation changes the characteristic set, so a *different* certificate is computed for that
+component. This is Wu's zero decomposition,
+
+```
+Zero(P) = Zero(CS / J) ∪ ⋃ᵢ Zero(P ∪ {Iᵢ})
+```
+
+driven by the goal rather than computed in full: only the branches the proof actually needs
+get explored.
+
+`depth` bounds the recursion. Wu's well-ordering principle gives termination — each branch
+adds an equation and the rank strictly decreases — but the bound is what makes a failure a
+clean one rather than a hang. At depth 0 the tactic degrades to plain `wu`, leaving the
+remaining conditions as side goals. -/
+
+/-- From a leftover nondegeneracy goal, recover the polynomial that must be nonzero.
+
+Handles `a ≠ 0`, the `¬(a = 0)` spelling, and the `IsUnit a` form that `wu` emits on rings
+that are not domains. -/
+private def degenerateArg? (ty : Expr) : Option Expr :=
+  let ty := ty.consumeMData
+  if let some (_, a, _) := ty.ne? then some a
+  else if ty.isAppOfArity ``IsUnit 3 then some ty.appArg!
+  else match ty.not? with
+    | some inner => match inner.consumeMData.eq? with
+      | some (_, a, _) => some a
+      | none => none
+    | none => none
+
+/-- `wu!`: prove the goal on every component, splitting on nondegeneracy conditions. -/
+partial def wuAllCore (cfg : Config) (ref : Syntax) (depth : Nat) : TacticM Unit :=
+  withMainContext do
+    -- Probe: run the ordinary tactic and see what it could not discharge. The leftover
+    -- goals *are* the conditions, so there is no need to guess which factor is the
+    -- problem — splitting on a factor that is already available would not terminate.
+    let leftover ← withoutModifyingState do
+      try
+        wuCore cfg ref false
+        (← getGoals).mapM fun g => do instantiateMVars (← g.getType)
+      catch _ => pure []
+    match leftover, depth with
+    | [], _ => wuCore cfg ref false
+    | _, 0 => wuCore cfg ref false
+    | ty :: _, d + 1 =>
+      match degenerateArg? ty with
+      | none => wuCore cfg ref false
+      | some I =>
+        let Istx ← Term.exprToSyntax I
+        evalTactic (← `(tactic| by_cases wu_deg : $Istx = 0))
+        let gs ← getGoals
+        let mut out : List MVarId := []
+        -- `by_cases` puts the positive branch first, so index 0 is the degenerate
+        -- component. Naming it in the error is the whole point: a failure here is a
+        -- *mathematical* fact about where the theorem stops holding, not a tactic hiccup.
+        for (g, i) in gs.zipIdx do
+          unless ← g.isAssigned do
+            setGoals [g]
+            try
+              wuAllCore cfg ref d
+            catch e =>
+              let comp ← PrettyPrinter.delab I
+              if i == 0 then
+                throwError "wu!: the goal does not follow on the degenerate component \
+                  where {comp} = 0.\n\
+                  Either that configuration is a genuine counterexample, or it needs a \
+                  hypothesis ruling it out.\n\n{e.toMessageData}"
+              else
+                throwError "wu!: failed on the component where {comp} ≠ 0.\n\n\
+                  {e.toMessageData}"
+            out := out ++ (← getGoals)
+        setGoals out
+
+@[inherit_doc wuTac]
+syntax (name := wuTacAll) "wu!"
+  (atomic(" (" &"depth") " := " num ")")?
+  (atomic(" (" &"algo") " := " ident ")")?
+  (atomic(" (" &"vars") " := " "[" term,* "]" ")")?
+  (" [" term,* "]")? : tactic
+
 elab_rules : tactic
   | `(tactic| wu $[(algo := $algo:ident)]? $[(vars := [$vs,*])]? $[[$hs,*]]?) => do
     wuCore (← mkConfig algo vs hs) (← getRef) false
   | `(tactic| wu? $[(algo := $algo:ident)]? $[(vars := [$vs,*])]? $[[$hs,*]]?) => do
     wuCore (← mkConfig algo vs hs) (← getRef) true
+  | `(tactic| wu! $[(depth := $d)]? $[(algo := $algo:ident)]?
+        $[(vars := [$vs,*])]? $[[$hs,*]]?) => do
+    wuAllCore (← mkConfig algo vs hs) (← getRef) (match d with | some n => n.getNat | none => 3)
 
 end Wu

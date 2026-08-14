@@ -121,14 +121,19 @@ case: the flex conditions force the velocity field to be an infinitesimal isomet
 -- `vC = 0`.
 --
 -- The nondegeneracy is `det ≠ 0`, twice the signed area — exactly "the triangle does not
--- collapse", which is the hypothesis a rigidity theorem carries anyway. `C.1 ≠ B.1` is an
--- extra condition the *method* needs (the edge BC must not be vertical), not the theorem.
-#wu_bench theorem triangle_rigid (A B C vC : Pt) (hCB : C.1 - B.1 ≠ 0)
+-- collapse", which is the hypothesis a rigidity theorem carries anyway.
+--
+-- This used to carry a second hypothesis, `C.1 - B.1 ≠ 0`, with a note that it was an
+-- artefact of the method — the edge `BC` must not be vertical for pseudo-division to
+-- proceed — and not a condition of the theorem. `wu!` removes it: on the vertical-edge
+-- component it recomputes a different characteristic set and proves the goal there too.
+-- The note is now a demonstration rather than an apology.
+#wu_bench theorem triangle_rigid (A B C vC : Pt)
     (hdet : (C.1 - B.1) * (A.2 - C.2) - (C.2 - B.2) * (A.1 - C.1) ≠ 0)
     (eBC : (C.1 - B.1) * vC.1 + (C.2 - B.2) * vC.2 = 0)
     (eCA : (A.1 - C.1) * vC.1 + (A.2 - C.2) * vC.2 = 0) :
     vC.1 = 0 := by
-  wu (vars := [A.1, A.2, B.1, B.2, C.1, C.2, vC.2, vC.1])
+  wu! (vars := [A.1, A.2, B.1, B.2, C.1, C.2, vC.2, vC.1])
 
 -- A rigid motion is always a flex: the infinitesimal rotation `v = (-y, x)` preserves
 -- every edge length to first order, for any two points.
