@@ -194,4 +194,100 @@ theorem inner_d22_d1 (hf : ContDiff ℝ ∞ f) (p : ℝ × ℝ) :
   rw [d2_F hf, ← inner_d21_d2 hf, real_inner_comm (d2 (d2 f) p) (d1 f p)]
   ring
 
+/-! ### Gauss–Weingarten, and the Christoffel symbols as derived quantities
+
+Where the two halves meet. A surface point has the frame `{f_u, f_v, n}`; expanding a
+second derivative in it *defines* the Christoffel symbols as its tangential coefficients.
+Pairing that decomposition against `f_u` and `f_v` gives two linear equations, whose
+right-hand sides are the inner products **derived** above rather than assumed.
+
+Eliminating the unwanted coefficient from those two equations is a polynomial elimination —
+so it is `wu` that closes the gap, and what comes out is precisely the relation
+`WuDifferential/Curvature.lean` takes as a hypothesis. -/
+
+section Frame
+
+variable {p : ℝ × ℝ} {n : V} {c₁ c₂ l : ℝ}
+
+/-- Pairing a frame decomposition `w = c₁ f_u + c₂ f_v + l n` against `f_u`. The normal
+term drops out, which is the only thing orthogonality is ever used for. -/
+theorem inner_frame_d1 {w : V} (hn1 : ⟪n, d1 f p⟫ = 0)
+    (hw : w = c₁ • d1 f p + c₂ • d2 f p + l • n) :
+    ⟪w, d1 f p⟫ = c₁ * E f p + c₂ * F f p := by
+  rw [hw, inner_add_left, inner_add_left, real_inner_smul_left, real_inner_smul_left,
+    real_inner_smul_left, hn1]
+  rw [show ⟪d2 f p, d1 f p⟫ = F f p from real_inner_comm _ _]
+  rw [show ⟪d1 f p, d1 f p⟫ = E f p from rfl]
+  ring
+
+/-- The same against `f_v`. -/
+theorem inner_frame_d2 {w : V} (hn2 : ⟪n, d2 f p⟫ = 0)
+    (hw : w = c₁ • d1 f p + c₂ • d2 f p + l • n) :
+    ⟪w, d2 f p⟫ = c₁ * F f p + c₂ * G f p := by
+  rw [hw, inner_add_left, inner_add_left, real_inner_smul_left, real_inner_smul_left,
+    real_inner_smul_left, hn2]
+  rw [show ⟪d1 f p, d2 f p⟫ = F f p from rfl]
+  rw [show ⟪d2 f p, d2 f p⟫ = G f p from rfl]
+  ring
+
+/-- **`2W Γ¹₁₁ = G E_u - 2F F_u + F E_v`.**
+
+This is `WuDifferential/Curvature.lean`'s hypothesis `h111`, here a *theorem*: the inputs
+are the frame decomposition of `f_uu` and the derived inner products, and the elimination
+of `Γ²₁₁` between the two pairings is done by `wu`.
+
+**No regularity hypothesis is needed.** `wu` returns a certificate with multiplier `1`, so
+`EG - F² ≠ 0` never enters. That is not an accident of this proof: stating the relation in
+*cleared* form `2W·Γ¹₁₁ = …` rather than solving for `Γ¹₁₁` means nothing is ever divided
+by `W`. Regularity is needed to recover `Γ¹₁₁` itself, not to state this. The hand-written
+version in `Curvature.lean` carries `2W ≠ 0` throughout; it did not have to. -/
+theorem christoffel_111 (hf : ContDiff ℝ ∞ f) (hn1 : ⟪n, d1 f p⟫ = 0)
+    (hn2 : ⟪n, d2 f p⟫ = 0)
+    (hdec : d1 (d1 f) p = c₁ • d1 f p + c₂ • d2 f p + l • n) :
+    2 * (E f p * G f p - F f p ^ 2) * c₁
+      = G f p * d1 (E f) p - 2 * F f p * d1 (F f) p + F f p * d2 (E f) p := by
+  have h₁ : c₁ * E f p + c₂ * F f p = d1 (E f) p / 2 := by
+    rw [← inner_frame_d1 hn1 hdec, inner_d11_d1 hf]
+  have h₂ : c₁ * F f p + c₂ * G f p = d1 (F f) p - d2 (E f) p / 2 := by
+    rw [← inner_frame_d2 hn2 hdec, inner_d11_d2 hf]
+  wu
+
+/-- **`2W Γ²₁₁ = 2E F_u - E E_v - F E_u`** — Curvature.lean's `h211`, likewise derived. -/
+theorem christoffel_211 (hf : ContDiff ℝ ∞ f) (hn1 : ⟪n, d1 f p⟫ = 0)
+    (hn2 : ⟪n, d2 f p⟫ = 0)
+    (hdec : d1 (d1 f) p = c₁ • d1 f p + c₂ • d2 f p + l • n) :
+    2 * (E f p * G f p - F f p ^ 2) * c₂
+      = 2 * E f p * d1 (F f) p - E f p * d2 (E f) p - F f p * d1 (E f) p := by
+  have h₁ : c₁ * E f p + c₂ * F f p = d1 (E f) p / 2 := by
+    rw [← inner_frame_d1 hn1 hdec, inner_d11_d1 hf]
+  have h₂ : c₁ * F f p + c₂ * G f p = d1 (F f) p - d2 (E f) p / 2 := by
+    rw [← inner_frame_d2 hn2 hdec, inner_d11_d2 hf]
+  wu
+
+/-- **`2W Γ¹₁₂ = G E_v - F G_u`** — the mixed symbol, from the decomposition of `f_uv`. -/
+theorem christoffel_112 (hf : ContDiff ℝ ∞ f) (hn1 : ⟪n, d1 f p⟫ = 0)
+    (hn2 : ⟪n, d2 f p⟫ = 0)
+    (hdec : d2 (d1 f) p = c₁ • d1 f p + c₂ • d2 f p + l • n) :
+    2 * (E f p * G f p - F f p ^ 2) * c₁
+      = G f p * d2 (E f) p - F f p * d1 (G f) p := by
+  have h₁ : c₁ * E f p + c₂ * F f p = d2 (E f) p / 2 := by
+    rw [← inner_frame_d1 hn1 hdec, inner_d21_d1 hf]
+  have h₂ : c₁ * F f p + c₂ * G f p = d1 (G f) p / 2 := by
+    rw [← inner_frame_d2 hn2 hdec, inner_d21_d2 hf]
+  wu
+
+/-- **`2W Γ²₁₂ = E G_u - F E_v`** — Curvature.lean's `h212`. -/
+theorem christoffel_212 (hf : ContDiff ℝ ∞ f) (hn1 : ⟪n, d1 f p⟫ = 0)
+    (hn2 : ⟪n, d2 f p⟫ = 0)
+    (hdec : d2 (d1 f) p = c₁ • d1 f p + c₂ • d2 f p + l • n) :
+    2 * (E f p * G f p - F f p ^ 2) * c₂
+      = E f p * d1 (G f) p - F f p * d2 (E f) p := by
+  have h₁ : c₁ * E f p + c₂ * F f p = d2 (E f) p / 2 := by
+    rw [← inner_frame_d1 hn1 hdec, inner_d21_d1 hf]
+  have h₂ : c₁ * F f p + c₂ * G f p = d1 (G f) p / 2 := by
+    rw [← inner_frame_d2 hn2 hdec, inner_d21_d2 hf]
+  wu
+
+end Frame
+
 end WuSurface
