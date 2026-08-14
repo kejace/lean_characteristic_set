@@ -13,3 +13,4 @@ import WuDifferential.SurfaceComparison
 import WuDifferential.SurfaceGauss
 import WuDifferential.SurfaceGaussWu
 import WuDifferential.SurfaceGaussComparison
+import WuDifferential.SurfaceCodim2
