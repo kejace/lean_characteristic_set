@@ -246,9 +246,34 @@ divides by `m + 1`, which is *never* zero, so there is no case analysis at all. 
 `ℚ`-algebra hypothesis is exactly this division, and in characteristic `p` the lemma is
 false.
 
-**Steps 3 and 4 remain**: the product lemma, then Ritt–Raudenbush by Noetherian induction,
-then removing fuel from `completeCoherent`. Step 3 is now the only thing standing between
-here and the basis theorem.
+**Step 3, first half: done.** The product lemma `{S}·{T} ⊆ {S·T}`
+(`radicalDiffIdeal_mul_le`), via the colon ideal applied twice and resting on one small
+fact — `deriv_mul_mem`: in a radical differential ideal, `a·b ∈ I` forces `(da)·b ∈ I`. That
+one needs no `ℚ`.
+
+**Step 3, second half: blocked, and for a reason the plan missed.**
+
+Ritt–Raudenbush is not a theorem about an arbitrary Ritt algebra. It is a theorem about the
+**differential polynomial ring** `R{y₁,…,yₙ}`: every radical differential ideal *of that
+ring* is finitely generated. The hard step — a prime radical differential ideal is finitely
+generated — goes through characteristic sets computed *inside* that ring.
+
+We do not have that ring as a Lean object. Our differential polynomials are
+`abbrev Poly := Array Term` plus an `MAtomTable`: a computational representation with no
+`CommRing` instance and no `Derivation`. Building `R{y₁,…,yₙ}` as an algebraic structure —
+with its ranking, its derivation, and the reduction theory — is a development comparable in
+size to all of Item C so far, and it is a prerequisite rather than a detail.
+
+So step 3 stops at the product lemma. The Zorn / maximal-counterexample half could be
+attempted (it is general, and is exactly what the product lemma is for), but its final step
+— concluding finite generation from the two finitely generated extensions — is intricate
+enough that writing it from memory rather than from a source would be guessing, and it would
+not complete the theorem regardless without the prime case.
+
+**Step 4 is therefore blocked too**, since removing fuel from `completeCoherent` depends on
+the basis theorem. That is not a loss of soundness: fuel exhaustion returns the set reached
+and `isCoherent` reports it as incomplete, so a caller cannot mistake a timeout for a result.
+This was flagged in the plan from the start as the reason C buys less than it appears to.
 
 ### Risk
 
