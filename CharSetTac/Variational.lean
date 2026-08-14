@@ -230,6 +230,65 @@ theorem E_deriv (L : P) : E (Dtot L) = 0 := by
   rw [h1, hN, euler_deriv, pd_eq_zero_of_order_lt (L := L) (k := N) (by omega)]
   simp
 
+/-! ### `E` as a linear map, and functionals
+
+`E` is defined by a truncation that depends on its argument, so linearity is not free: it
+comes from choosing one truncation long enough for every polynomial involved. -/
+
+theorem euler_add (N : ℕ) (L M : P) : euler N (L + M) = euler N L + euler N M := by
+  simp only [euler, ← Finset.sum_add_distrib, map_add, iterate_deriv_add, smul_add]
+
+/-- The iterated total derivative is `ℚ`-homogeneous. As with `iterate_deriv_add`, `map_smul`
+handles one application and the induction lifts it under the iterate. -/
+private theorem iterate_deriv_smul (n : ℕ) (c : ℚ) (a : P) :
+    (Dtot : P → P)^[n] (c • a) = c • (Dtot : P → P)^[n] a := by
+  induction n generalizing a with
+  | zero => rfl
+  | succ n ih =>
+      rw [Function.iterate_succ_apply, Function.iterate_succ_apply, Derivation.map_smul, ih]
+
+theorem euler_smul (N : ℕ) (c : ℚ) (L : P) : euler N (c • L) = c • euler N L := by
+  simp only [euler, Finset.smul_sum]
+  refine Finset.sum_congr rfl fun k _ => ?_
+  rw [Derivation.map_smul, iterate_deriv_smul, smul_comm]
+
+theorem E_add (L M : P) : E (L + M) = E L + E M := by
+  set N := max (order (L + M)) (max (order L) (order M)) + 1 with hN
+  rw [E_eq_euler (L := L + M) (N := N) (by omega), E_eq_euler (L := L) (N := N) (by omega),
+    E_eq_euler (L := M) (N := N) (by omega), euler_add]
+
+theorem E_smul (c : ℚ) (L : P) : E (c • L) = c • E L := by
+  set N := max (order (c • L)) (order L) + 1 with hN
+  rw [E_eq_euler (L := c • L) (N := N) (by omega), E_eq_euler (L := L) (N := N) (by omega),
+    euler_smul]
+
+/-- **The Euler operator**, bundled. -/
+noncomputable def Elin : P →ₗ[ℚ] P where
+  toFun := E
+  map_add' := E_add
+  map_smul' := E_smul
+
+/-- **Functionals**: differential polynomials modulo total derivatives.
+
+The algebraic stand-in for `∫ L dx`. Two Lagrangians differing by a total derivative have the
+same integral (up to boundary terms) and must define the same variational problem, so the
+functional is the class, not the representative. -/
+noncomputable abbrev Functionals : Type :=
+  P ⧸ LinearMap.range (Dtot.toLinearMap : P →ₗ[ℚ] P)
+
+/-- **The variational derivative is well defined on functionals.**
+
+This is `E ∘ D = 0` doing its structural job: because `E` kills total derivatives, it factors
+through the quotient, so "the Euler–Lagrange equations of a functional" is a legitimate
+notion rather than an artefact of the chosen Lagrangian. -/
+noncomputable def EFunctional : Functionals →ₗ[ℚ] P :=
+  Submodule.liftQ _ Elin (by
+    rintro _ ⟨f, rfl⟩
+    exact E_deriv f)
+
+@[simp] theorem EFunctional_mk (L : P) :
+    EFunctional (Submodule.Quotient.mk L) = E L := rfl
+
 /-! ### Worked Lagrangians
 
 Each of these has order `1`, so `euler 3` is already the full Euler operator on it. The
