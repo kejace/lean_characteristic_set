@@ -88,7 +88,7 @@ theorem skew₁ (h₁ : ContDiff ℝ ∞ n₁) (h₂ : ContDiff ℝ ∞ n₂)
   have h0 : d1 (fun q => ⟪n₁ q, n₂ q⟫) p = 0 := by
     rw [show (fun q => ⟪n₁ q, n₂ q⟫) = fun _ : ℝ × ℝ => (0 : ℝ) from funext h₁₂, d1]; simp
   rw [d1_inner (h₁.differentiable (by simp) p) (h₂.differentiable (by simp) p)] at h0
-  show ⟪d1 n₂ p, n₁ p⟫ = -⟪d1 n₁ p, n₂ p⟫
+  change ⟪d1 n₂ p, n₁ p⟫ = -⟪d1 n₁ p, n₂ p⟫
   rw [real_inner_comm (d1 n₂ p) (n₁ p)] at h0
   linarith
 
@@ -99,7 +99,7 @@ theorem skew₂ (h₁ : ContDiff ℝ ∞ n₁) (h₂ : ContDiff ℝ ∞ n₂)
   have h0 : d2 (fun q => ⟪n₁ q, n₂ q⟫) p = 0 := by
     rw [show (fun q => ⟪n₁ q, n₂ q⟫) = fun _ : ℝ × ℝ => (0 : ℝ) from funext h₁₂, d2]; simp
   rw [d2_inner (h₁.differentiable (by simp) p) (h₂.differentiable (by simp) p)] at h0
-  show ⟪d2 n₂ p, n₁ p⟫ = -⟪d2 n₁ p, n₂ p⟫
+  change ⟪d2 n₂ p, n₁ p⟫ = -⟪d2 n₁ p, n₂ p⟫
   rw [real_inner_comm (d2 n₂ p) (n₁ p)] at h0
   linarith
 

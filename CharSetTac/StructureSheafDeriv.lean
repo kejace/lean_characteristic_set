@@ -99,7 +99,7 @@ theorem sectionDeriv_mem (d : Derivation R A A) {U : Opens (PrimeSpectrum.Top A)
   refine ⟨fun hmem => (hp.mem_or_mem hmem).elim hs hs, ?_⟩
   -- `hw` is stated about the composite; beta-reduce it to talk about `f (i y)`
   have hw' : f (i y) = LocalizedModule.mk r ⟨s, hs⟩ := hw
-  show stalkDeriv d _ (f (i y)) = _
+  change stalkDeriv d _ (f (i y)) = _
   rw [hw']
   exact stalkDeriv_mk d _ r ⟨s, hs⟩
 
@@ -155,14 +155,14 @@ noncomputable def sheafDeriv (d : Derivation R A A) (U : Opens (PrimeSpectrum.To
       -- the `R`-action is by a constant from `A`, which the derivation annihilates
       have hc : ((algebraMap R (Sections A U)) r).1 x
           = algebraMap A (Localizations A x.1) (algebraMap R A r) := rfl
-      show stalkDeriv d x.1 (((algebraMap R (Sections A U)) r).1 x * f.1 x)
+      change stalkDeriv d x.1 (((algebraMap R (Sections A U)) r).1 x * f.1 x)
         = ((algebraMap R (Sections A U)) r).1 x * stalkDeriv d x.1 (f.1 x)
       rw [Derivation.leibniz, hc]
       simp [stalkDeriv, Derivation.localization_algebraMap, Derivation.map_algebraMap,
         smul_eq_mul])
     map_one_eq_zero' := Subtype.ext (funext fun x => (stalkDeriv d x.1).map_one_eq_zero)
     leibniz' := fun f g => Subtype.ext (funext fun x => by
-      show stalkDeriv d x.1 (f.1 x * g.1 x) = _
+      change stalkDeriv d x.1 (f.1 x * g.1 x) = _
       rw [Derivation.leibniz]
       simp only [smul_eq_mul]
       rfl) }

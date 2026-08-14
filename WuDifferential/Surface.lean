@@ -152,7 +152,7 @@ theorem d_swap (hf : ContDiff ℝ ∞ f) (p : ℝ × ℝ) : d2 (d1 f) p = d1 (d2
   have hd : DifferentiableAt ℝ (fderiv ℝ f) p := by
     have h : ContDiff ℝ ∞ (fderiv ℝ f) := hf.fderiv_right (by simp)
     exact h.differentiable (by simp) p
-  show fderiv ℝ (fun q => fderiv ℝ f q (1, 0)) p (0, 1)
+  change fderiv ℝ (fun q => fderiv ℝ f q (1, 0)) p (0, 1)
      = fderiv ℝ (fun q => fderiv ℝ f q (0, 1)) p (1, 0)
   rw [fderiv_apply_const hd, fderiv_apply_const hd]
   -- `simp` reduces `minSmoothness ℝ 2 ≤ ∞` to `2 ≤ ∞` but stops there; `∞` is not `⊤` in

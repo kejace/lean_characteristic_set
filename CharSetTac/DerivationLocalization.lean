@@ -176,7 +176,7 @@ noncomputable def localization (d : Derivation R A A) (S : Submonoid A)
     simp [Algebra.smul_def, smul_eq_mul]
   map_one_eq_zero' := by simp
   leibniz' b c := by
-    show (d.dualLift S (b * c)).snd
+    change (d.dualLift S (b * c)).snd
       = b • (d.dualLift S c).snd + c • (d.dualLift S b).snd
     rw [map_mul, TrivSqZeroExt.snd_mul, dualLift_fst, dualLift_fst]
     -- `snd_mul` states the second summand with the opposite action; over a commutative
@@ -188,7 +188,7 @@ derivation restricts to the old one along `A → B`. -/
 @[simp] theorem localization_algebraMap (d : Derivation R A A) (S : Submonoid A)
     [IsLocalization S B] (a : A) :
     d.localization S (algebraMap A B a) = algebraMap A B (d a) := by
-  show (d.dualLift S (algebraMap A B a)).snd = _
+  change (d.dualLift S (algebraMap A B a)).snd = _
   rw [dualLift_algebraMap]
   simp [toDualLift, TrivSqZeroExt.dualMap, Algebra.smul_def,
     TrivSqZeroExt.algebraMap_eq_inl, TrivSqZeroExt.fst_inl]

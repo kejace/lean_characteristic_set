@@ -118,7 +118,7 @@ theorem inner_d1n_d2f (hf : ContDiff ℝ ∞ f) (hn : ContDiff ℝ ∞ n)
       ((contDiff_d2 hf).differentiable (by simp) p)] at h0
   -- Leibniz produced `f_vu`; Schwarz turns it into the `f_uv` that `M` is defined by
   rw [← d_swap hf p] at h0
-  show ⟪d1 n p, d2 f p⟫ = -⟪d2 (d1 f) p, n p⟫
+  change ⟪d1 n p, d2 f p⟫ = -⟪d2 (d1 f) p, n p⟫
   rw [real_inner_comm (d2 (d1 f) p) (n p)] at h0
   linarith
 

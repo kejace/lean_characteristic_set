@@ -19,6 +19,8 @@ pp.unicode.fun = true # pretty-prints `fun a ↦ b`
 autoImplicit = false
 relaxedAutoImplicit = false
 weak.linter.mathlibStandardSet = true
+# `show` may only restate a goal; if it *changes* the goal, `change` is required.
+weak.linter.style.show = true
 maxSynthPendingDepth = 3
 
 
