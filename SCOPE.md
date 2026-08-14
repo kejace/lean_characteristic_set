@@ -1,0 +1,206 @@
+# Scope: what this differential-algebra layer can reach, and what it cannot
+
+Written 2026-08-14 after a literature sweep across the variational bicomplex, jet/contact/
+symplectic geometry, and the Ritt–Kolchin / symbolic-computation strand. Sources at the end.
+
+The organising fact is a clean one, and all three strands of the sweep converge on it:
+
+> **The entire `E₁`-page of Vinogradov's C-spectral sequence — the Lagrangian formalism, the
+> Euler operator, the Helmholtz conditions, the one-line and two-line theorems — is a theorem
+> about modules over a differential ring.** Only the identification of the *abutment* with de
+> Rham cohomology, and the global inverse problem, need geometry.
+
+So the question is not "can algebra reach the calculus of variations" — it can, essentially
+all of it. The question is which algebra we have.
+
+---
+
+## 1. What is built and building
+
+Verified: full `lake build` clean, 8788 jobs, no `sorry` in any file below, axioms
+`propext / Classical.choice / Quot.sound` throughout.
+
+| Area | Files | Status |
+|---|---|---|
+| `R{y}` = `MvPolynomial (σ × ℕ) R`, universal property | `DiffPolynomial.lean` | ✅ |
+| Differential ideals, radical closure `{S}`, Ritt's lemma, product lemma | `DiffSpec.lean`, `RadicalDiffIdeal.lean` | ✅ |
+| Ritt–Raudenbush **reduction to primes** | `RittRaudenbush.lean` | ✅ (second half open — §3) |
+| `⁅∂/∂y^(k+1), D⁆ = ∂/∂y^(k)`; Euler operator; `E ∘ D = 0`; functionals `P/im D`; integration by parts | `Variational.lean` | ✅ |
+| Jet ring **with** independent variable; contact submodule; `df ≡ (Df) dx (mod contact)` | `JetContact.lean` | ✅ |
+| `Derivation.localization`, differential `Spec`, structure-sheaf derivation | `DerivationLocalization.lean`, `StructureSheafDeriv.lean` | ✅ |
+| `wu` / `wu_pde` tactics; Gauss–Codazzi–Ricci from `fderiv` | `Frontend.lean`, `WuDifferential/` | ✅ |
+
+Two of these turn out to be positioned exactly where the literature says the algebraic core
+lives. `[∂/∂u_i^(n), ∂] = ∂/∂u_i^(n−1)` is Barakat–De Sole–Kac eq. (1.2), which they take as
+an *axiom* defining an "algebra of differential functions" — our `lie_pd_succ_deriv`. And
+`⁅gradeDeriv, D⁆ = D` in `DiffPolynomialHeavy.lean` is the degree evolutionary field that
+drives their Theorem 3.5 homotopy.
+
+---
+
+## 2. The three structural limits
+
+Everything that is out of reach traces to one of these.
+
+### 2.1 One derivation
+
+`R{y}` is Ritt–Kolchin's **ordinary** case. The standard object is `k{Y} = k[ΘY]` with `Θ`
+the free commutative monoid on `Δ = {δ₁,…,δ_m}`, i.e. index type `σ × (Δ →₀ ℕ)`.
+
+**Verified**: the *ring*, its derivations, and their commutation generalise mechanically —
+`MathlibableEvidence.lean` builds `DiffPoly R σ Δ` with `deriv_comm` and it compiles. The
+*universal property* does not: `evalDiff` must send `θ y_i` to an order-independent product
+of iterated derivations over `θ.support`, and `Finset.prod` cannot express it because
+`Module.End R A` is not commutative. Routes: `Finset.noncommProd`, or
+`Submonoid.closureCommMonoidOfComm` on the commuting family. Moderate, not mechanical.
+
+What this costs: PDEs, conservation-law theory proper, and everything in the middle of the
+horizontal complex (for `m = 1` the bicomplex degenerates to one column). Also
+**multidimensional Poisson vertex algebras are a genuinely harder theory, not a
+generalisation** — Carlet–Casati–Shadrin show the deformation theory is non-trivial for
+`D > 1`, with non-vanishing 2nd and 3rd Poisson cohomology. Do not assume `m = 1` results lift.
+
+### 2.2 Base of constants
+
+`MvPolynomial.mkDerivation` produces an `R`-*linear* derivation, so `D` annihilates `R`.
+Kolchin's `R{Y}` is over a differential ring. Without an `x` satisfying `Dx = 1` there is no
+independent variable, hence no `x`-dependent Lagrangian and **no contact forms at all** — the
+`dx` has nothing to refer to.
+
+Sharp algebraic statement of the obstruction: under `Derivation R A A ≃ (Ω[A⁄R] →ₗ[A] A)` the
+derivation is a contraction `ι_D`, the contact submodule is `ker ι_D`, and **`ι_D` is
+surjective iff some `a` has `Da = 1`**. For `R{y}` the image is the proper ideal `(y',y'',…)`,
+so there is no splitting and no horizontal line.
+
+**Fixed, for the jet ring**: `JetContact.lean` adjoins `x` with `Dx = 1` and gets the
+splitting and `df ≡ (Df) dx (mod contact)`. `DiffPolynomial` itself remains over constants,
+which is correct for the ideal theory and for §1's variational results — neither needs `x`.
+
+### 2.3 Characteristic zero
+
+Not incidental. Every homotopy operator in the subject divides by an integer. Formalized as a
+boundary case: over `𝔽₂`, `D(y²) = 0` with `y² ≠ 0`, so `ker D` is far larger than the
+constants and exactness fails at step one. This is the same reason Ritt's lemma carries
+`[Algebra ℚ A]`.
+
+---
+
+## 3. Reachable next, in order
+
+All three research strands independently rank the same theorem first.
+
+**(a) `ker E = R ⊕ D(R{y})` — the converse to `E ∘ D = 0`.** Olver Thm 4.7 (1st ed. p. 252);
+Barnich–Brandt–Henneaux Thm 4.1(i); Barakat–De Sole–Kac Prop. 1.5.
+
+Note the `R` summand — it is *not* `ker E = im D`. We have already formalized why
+(`range_deriv_lt_ker_E`), and it is worth knowing that Olver–Shakiban's *A resolution of the
+Euler operator I* prints the complex as exact and over-claims by exactly this summand.
+
+Route: the graded homotopy. With `Δ = ∑ y^(k) ∂/∂y^(k)` the *total-degree* operator (note:
+**not** our `gradeDeriv`, which weights by order `k`),
+
+```
+  Δ L = y · E(L) + D(I(L)),    I(L) = ∑_{k≥1} ∑_{i<k} y^(i) (−D)^{k−1−i} (∂L/∂y^(k))
+```
+
+so a homogeneous `L` of degree `n ≥ 1` with `E(L) = 0` is `D(I(L)/n)`. Our `ibp` is exactly
+the lemma this needs.
+
+**Blocker, verified**: Mathlib's Euler identity `IsHomogeneous.sum_X_mul_pderiv` requires
+`[Fintype σ]`, and ours is `Unit × ℕ`. A version summing over a finite superset of `vars` has
+to be proved. That is the real work, and it is *also* a clean Mathlib contribution.
+
+**(b) `ker D = R`.** Short: if `p` has top order `N`, `Dp` contains `(∂p/∂y^(N)) y^(N+1)`,
+which cannot cancel. Gives `H⁰` of the horizontal complex.
+
+**(c) Helmholtz — take the graded shortcut.** Olver Thm 5.92 (2nd ed.) needs the Fréchet
+derivative and formal adjoint. But Olver–Shakiban Corollary 2 gives, for our exact setting,
+`P = E(L) ⟺ F(P) = N(P)` with `L = y·P/(n+1)` — self-adjointness tested on the single element
+`y`, one scalar condition instead of the infinite Helmholtz system. Cheapest route by far.
+
+**(d) The variational complex proper.** `Ω̃ = Λ•_A Ω[A⁄R]` with `δ` the Kähler differential,
+`Ω = Ω̃ / L_D Ω̃`. Target Barakat–De Sole–Kac Thm 3.5 (graded homotopy, reuses `gradeDeriv`)
+before Thm 3.2 (needs a `Normal` typeclass carrying antiderivatives `∫du_i^(n)` as data —
+note a bare differential algebra is *not* normal, so the partials must be data, not derived).
+
+**(e) Ritt–Raudenbush, second half.** Primes in `R{y}` are finitely generated — the
+characteristic-set argument, i.e. where *this project's engine* already lives (minimal-rank
+element = characteristic set, pseudo-division = `Wu.prem`). Note which half is which: the
+abstract half we proved is the short one.
+
+---
+
+## 4. What is outside, and why
+
+| Item | Why it is out |
+|---|---|
+| **Cartan–Kähler** | An `n`-fold stack of Cauchy–Kovalevskaya. Majorant series; **false in `C^∞`** (Lewy 1957). Formal integrability is algebraic; *convergence* is not. |
+| **Darboux / Gray stability / Moser** | Flows with smooth parameter dependence and a genuine integral. Not algebraic. (No loss for multisymplectic work — there is *no* multisymplectic Darboux theorem; Ryvkin builds 3-forms on `ℝ⁶` with non-constant linear type.) |
+| **Frobenius leaves of the Cartan distribution** | Involutivity is free algebraically (`[D_i,D_j] = 0` is an identity), but Frobenius fails in infinite dimensions. Replaced by the universal property: differential ring maps out of `R{y}` *are* the "integral manifolds". |
+| **The variational principle as a statement about `∫`** | Needs orientation, measure, function space, Stokes to kill the boundary term. Sidestepped the way BBH do — define functionals as `V/∂V`, which is what `Functionals` is. |
+| **Abutment `≅ H•_dR`, Takens acyclicity, global inverse problem** | Partitions of unity, Mayer–Vietoris. Genuinely topological. |
+| **C-spectral sequence line theorems** | They *compute* manifold de Rham cohomology. The `E₁` page is algebra; the convergence is not. |
+
+---
+
+## 5. What we would have to add
+
+**On our side:** the Δ-indexed ring's universal property (§2.1); an Euler identity for
+infinitely many variables (§3a); a `Normal` typeclass carrying antiderivatives (§3d).
+
+**In Mathlib** — none of this exists (all checked against our pin, `db584cd6`, v4.33.0):
+
+- **No graded wedge on alternating maps.** `domCoprod` lands in `⊗`, not `Λ`. This is the
+  single missing primitive blocking any forms work, including §3d.
+- **No algebraic de Rham complex** `Ω^p_{A/R}` with `d` — only `Ω¹` (`KaehlerDifferential`).
+- **No Koszul complex** by name — and Krasil'shchik–Verbovetsky's entire engine (Thm 1.19,
+  hence Thm 2.8, hence the one-line theorem) *is* Koszul exactness.
+- **No Ore extension with a derivation.** `Algebra/SkewPolynomial/Basic.lean` implements only
+  the endomorphism twist `Xa = φ(a)X`; the file says so. Needed for Hamiltonian operators.
+- **No jets, no contact geometry, no symplectic manifolds, no variational calculus.** Zero
+  files for each. `LinearAlgebra/SymplecticGroup.lean` is matrices; `extDeriv` is normed
+  spaces only, with its own TODO saying manifolds are not defined yet.
+
+What *is* usable today and worth leaning on: `KaehlerDifferential.mvPolynomialBasis` (so
+`Ω[R{y}⁄R]` is free on `dy^(k)`, with `mvPolynomialBasis_repr_apply = pderiv`), the cotangent
+exact sequence `exact_mapBaseChange_map` (which *is* the horizontal/vertical splitting),
+`Derivation.Lie`, and `Module.Basis.exteriorPower`.
+
+---
+
+## 6. An orthogonal track worth noting
+
+Exterior differential systems have a core that is **finite-dimensional linear algebra**:
+tableaux `A ⊂ W ⊗ V*`, prolongation `A^(1) = ker(δ|_{A⊗V*})`, Cartan characters, and Cartan's
+test as an equality of dimensions. Seiler's symbolic-system form (Prop. 3.2 + Thm 3.4) proves
+it by summing `n` short exact sequences and needs no Spencer cohomology computed explicitly.
+Serre's 1963 letter (printed in Guillemin–Sternberg, Bull. AMS 70 (1964), App. pp. 43–46)
+gives finiteness, and Malgrange's *Cartan involutiveness = Mumford regularity* identifies
+involutivity with Castelnuovo–Mumford regularity.
+
+This is adjacent to our engine rather than downstream of it: involutive bases were introduced
+by Gerdt–Blinkov generalising Janet, *"a special case was slightly earlier discovered by Wu"*,
+and Seiler shows the Cartan test and the Pommaret-basis inequality are the same inequality.
+
+---
+
+## Sources
+
+Anderson, *The Variational Bicomplex* ([PDF](https://ncatlab.org/nlab/files/AndersonVariationalBicomplex.pdf)) ·
+Olver, *Applications of Lie Groups to Differential Equations*, GTM 107 ([free notes](https://www-users.cse.umn.edu/~olver/sm_/v.pdf)) ·
+Olver & Shakiban, *A resolution of the Euler operator I*, Proc. AMS 69 (1978) 223–229 ([PDF](https://www.ams.org/journals/proc/1978-069-02/S0002-9939-1978-0486822-8/S0002-9939-1978-0486822-8.pdf)) ·
+Barakat, De Sole & Kac, *Poisson vertex algebras in the theory of Hamiltonian equations* ([arXiv:0907.1275](https://arxiv.org/abs/0907.1275)) ·
+De Sole & Kac, *Lie conformal algebra cohomology and the variational complex* ([arXiv:0812.4897](https://arxiv.org/abs/0812.4897)) ·
+Barnich, Brandt & Henneaux, *Local BRST cohomology* ([arXiv:hep-th/0002245](https://arxiv.org/abs/hep-th/0002245)) ·
+Krasil'shchik & Verbovetsky, *Homological Methods in Equations of Mathematical Physics* ([arXiv:math/9808130](https://arxiv.org/abs/math/9808130)) ·
+Vinogradov, *Introduction to Secondary Calculus* ([PDF](https://diffiety.mccme.ru/preprint/98/05_98.pdf)) ·
+Bryant, *Notes on Exterior Differential Systems* ([arXiv:1405.3116](https://arxiv.org/abs/1405.3116)) ·
+Seiler, *Spencer Cohomology, Differential Equations, and Pommaret Bases* ([PDF](https://www.mathematik.uni-kassel.de/~seiler/Papers/PDF/Spencer2.pdf)) ·
+Hydon, *Partial Euler operators and the efficient inversion of Div* ([arXiv:2212.08455](https://arxiv.org/abs/2212.08455)) ·
+Ritt, *Differential Algebra*, AMS Colloq. 33 (1950) · Kolchin, *Differential Algebra and Algebraic Groups* (1973).
+
+**One claim I am relaying rather than asserting.** The research agents searched for prior
+formalization of the variational bicomplex, the Euler operator on a differential algebra, jet
+bundles or the Helmholtz conditions in Lean, Coq, Isabelle, Agda and Mizar, and found none —
+the nearest being Physlib's *analytic* Euler–Lagrange operator over `Time → X`, which cannot
+state `E ∘ D = 0`. That is a search result, not a proof of absence.
