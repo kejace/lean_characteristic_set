@@ -45,25 +45,35 @@ derivation on each that commutes with restriction.
 Bundled by hand rather than through `TopCat.Presheaf` because all that is needed here is
 the commutation of `d` with restriction; the categorical packaging would add machinery
 without adding content. -/
-structure DiffPresheaf (X : Type*) [TopologicalSpace X] where
+structure DiffPresheaf (R : Type*) [CommRing R] (X : Type*) [TopologicalSpace X] where
   /-- Sections over an open set. -/
   sections : Opens X → Type*
   /-- Each is a commutative ring. -/
   [commRing : ∀ U, CommRing (sections U)]
-  /-- Each carries a derivation. -/
-  [diff : ∀ U, Differential (sections U)]
+  /-- Each is an `R`-algebra, so that `R`-linearity of the derivation makes sense. -/
+  [algebra : ∀ U, Algebra R (sections U)]
+  /-- Each carries an `R`-linear derivation.
+
+  Stated as `Derivation R` rather than via Mathlib's `Differential` class, which fixes the
+  base to `ℤ`. That is not a stylistic choice: `Differential` forces `Module ℤ` to come from
+  `AddCommGroup.toIntModule`, while a derivation obtained from an `Algebra` structure gets
+  it from `Algebra.toModule`, and the two are not definitionally equal. Anything built by
+  localizing lands on the wrong side of that diamond. Keeping a general base ring avoids it
+  entirely. -/
+  deriv : ∀ U, Derivation R (sections U) (sections U)
   /-- Restriction along an inclusion, as a ring homomorphism. -/
   restrict : ∀ {U V : Opens X}, V ≤ U → sections U →+* sections V
   /-- **The differential condition**: restriction commutes with the derivation. This is the
   only thing beyond an ordinary presheaf of rings, and it is what makes a chart-local
   differential computation meaningful globally. -/
-  restrict_deriv : ∀ {U V : Opens X} (h : V ≤ U) (a), restrict h (a′) = (restrict h a)′
+  restrict_deriv : ∀ {U V : Opens X} (h : V ≤ U) (a),
+    restrict h (deriv U a) = deriv V (restrict h a)
 
-attribute [instance] DiffPresheaf.commRing DiffPresheaf.diff
+attribute [instance] DiffPresheaf.commRing DiffPresheaf.algebra
 
 namespace DiffPresheaf
 
-variable {X : Type*} [TopologicalSpace X] (F : DiffPresheaf X)
+variable {R : Type*} [CommRing R] {X : Type*} [TopologicalSpace X] (F : DiffPresheaf R X)
 
 /-- `F` is **separated**: a section vanishing on every member of a cover vanishes.
 
