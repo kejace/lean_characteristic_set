@@ -248,10 +248,23 @@ def wuCore (cfg : Config) (ref : Syntax) (suggest : Bool) : TacticM Unit := with
       | none => pure piece
       | some c => `($c + $piece))
   let combStx := comb.getD (← `((0 : $(← Term.exprToSyntax R))))
-  let keyTac ← `(tactic|
-    have wu_key : $Mstx * ($lhsStx - $rhsStx) = 0 := by linear_combination $combStx:term)
-  let finishTac ← `(tactic|
-    refine sub_eq_zero.mp ((mul_eq_zero_iff_left ?wu_nd).mp wu_key))
+  -- **When the multiplier is `1` the ring need not be a domain.** Cancelling `M` uses
+  -- `mul_eq_zero_iff_left`, which wants `NoZeroDivisors`; but with `M = 1` there is
+  -- nothing to cancel, and demanding a domain anyway would rule out exactly the rings one
+  -- most wants to instantiate at — rings of functions, where bump functions with disjoint
+  -- support are zero divisors. See `WuDifferential/Manifold.lean`.
+  let trivialMult := scale == 1 && factors.isEmpty
+  let keyTac ←
+    if trivialMult then
+      `(tactic| have wu_key : $lhsStx - $rhsStx = 0 := by linear_combination $combStx:term)
+    else
+      `(tactic|
+        have wu_key : $Mstx * ($lhsStx - $rhsStx) = 0 := by linear_combination $combStx:term)
+  let finishTac ←
+    if trivialMult then
+      `(tactic| exact sub_eq_zero.mp wu_key)
+    else
+      `(tactic| refine sub_eq_zero.mp ((mul_eq_zero_iff_left ?wu_nd).mp wu_key))
   if suggest then
     -- The syntax used for elaboration wraps `Expr`s opaquely, which pretty-prints as
     -- `?m✝` and is useless to paste. Rebuild a display version from *delaborated*
@@ -276,10 +289,17 @@ def wuCore (cfg : Config) (ref : Syntax) (suggest : Bool) : TacticM Unit := with
     let subEqId := mkIdent ``sub_eq_zero
     let mulEqId := mkIdent ``mul_eq_zero_iff_left
     let mpId := mkIdent ``Iff.mp
-    let script ← `(tacticSeq|
-      have $keyId:ident : $Mdisp * ($lhsDisp - $rhsDisp) = 0 := by
-        linear_combination $combDispStx:term
-      refine $mpId $subEqId ($mpId ($mulEqId ?_) $keyId))
+    let script ←
+      if trivialMult then
+        `(tacticSeq|
+          have $keyId:ident : $lhsDisp - $rhsDisp = 0 := by
+            linear_combination $combDispStx:term
+          exact $mpId $subEqId $keyId)
+      else
+        `(tacticSeq|
+          have $keyId:ident : $Mdisp * ($lhsDisp - $rhsDisp) = 0 := by
+            linear_combination $combDispStx:term
+          refine $mpId $subEqId ($mpId ($mulEqId ?_) $keyId))
     Meta.Tactic.TryThis.addSuggestion ref script
     unless factors.isEmpty do
       let conds ← factors.mapM fun (I, _) => do
@@ -287,7 +307,9 @@ def wuCore (cfg : Config) (ref : Syntax) (suggest : Bool) : TacticM Unit := with
       logInfo m!"wu: nondegeneracy conditions (each must be nonzero): {conds.map (·.raw)}"
   evalTactic keyTac
   evalTactic finishTac
-  dischargeNondeg factors
+  -- With a trivial multiplier `finishTac` closes the goal outright, leaving nothing for
+  -- the nondegeneracy discharger to act on.
+  unless trivialMult do dischargeNondeg factors
 
 /-- `wu` proves an equational goal from equational hypotheses using Wu's characteristic
 set method, leaving any nondegeneracy conditions it cannot discharge as side goals.
