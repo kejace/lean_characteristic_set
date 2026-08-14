@@ -21,3 +21,4 @@ import CharSetTac.TestTactic
 import CharSetTac.TestDecomp
 import CharSetTac.Diff.Coherence
 import CharSetTac.Diff.TestCoherence
+import CharSetTac.BenchChecking
