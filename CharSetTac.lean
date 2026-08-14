@@ -23,3 +23,5 @@ import CharSetTac.Diff.Coherence
 import CharSetTac.Diff.TestCoherence
 import CharSetTac.BenchChecking
 import CharSetTac.DiffPdeTest
+import CharSetTac.DiffDemand
+import CharSetTac.DiffDemandTest

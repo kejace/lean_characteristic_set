@@ -48,16 +48,24 @@ example (y : R) (h : y′ = y) : ((y′)′)′ = y := by wu_diff (order := 2)
 prolongation of `u′ = v` had to be supplied by hand. -/
 example (u v : R) (h₁ : u′ = v) (h₂ : v′ = -u) : (u′)′ + u = 0 := by wu_diff
 
-/-! **A limit of the frontend.** The logistic equation `y′ = y(1-y)` is *not* proved by
-`wu_diff`: the automatic expansion produces a form the elimination does not reduce, and the
-explicit version in `WuDifferential/Theorems.lean` (which states the prolongation as
-`y″ = y′ - 2y·y′`) is still needed. Recorded rather than omitted — the frontend covers the
-common case, not every case.
+/-! ### A "limit" that turned out to be a bug
 
-```lean
+The logistic equation was recorded here as a limit of the frontend — the automatic
+expansion supposedly produced a form the elimination could not reduce. **That was wrong.**
+
+The real cause was two missing simp lemmas. `Derivation.leibniz` expanding `d (2 * ...)`
+left a live `d 2`, because Mathlib's `map_natCast` is stated for `Nat.cast` and a literal
+is `OfNat.ofNat`; and the simp set carried the *ring-hom* `map_one` rather than
+`Derivation.map_one_eq_zero`, so `d 1` survived too. Both were reflected as spurious atoms,
+quietly corrupting the characteristic set. The only symptom was the goal failing to reduce —
+which is exactly what a genuine limitation looks like from outside.
+
+Both are fixed in `CharSetTac/DiffFrontend.lean`, and the theorem now proves. Recorded
+because the lesson is about diagnosis: a tactic that reports "does not follow" is stating a
+fact about *its input*, and the input is worth reading before the failure is written up as
+mathematics. -/
+
 example (y : R) (h : y′ = y * (1 - y)) :
-    (y′)′ = y * (1 - y) * (1 - 2 * y) := by wu_diff   -- fails
-```
--/
+    (y′)′ = y * (1 - y) * (1 - 2 * y) := by wu_diff
 
 end

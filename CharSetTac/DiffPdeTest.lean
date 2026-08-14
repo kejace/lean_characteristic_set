@@ -35,39 +35,24 @@ example (d₁ d₂ : Derivation ℤ R R) (x y u v : R)
     d₂ u = -(d₁ v) := by
   wu_pde (derivs := [d₁, d₂])
 
-/-! ### A limit, and it is the informative one
+/-- Harmonicity: `∂₁∂₁u + ∂₂∂₂u = 0`, at second order.
 
-Harmonicity — `∂₁∂₁u + ∂₂∂₂u = 0` for the same `u` — is **not** proved by
-
-```lean
-wu_pde (derivs := [d₁, d₂]) (order := 2)
-```
-
-and this is worth stating precisely, because it is the boundary of the whole
-uniform-prolongation approach rather than a tuning failure.
-
-With one derivation, prolonging everything is cheap: the derivatives of a given quantity
-are totally ordered, so round `k` adds one new equation per hypothesis and the chain is
-naturally triangular. With two derivations at order 2 the same strategy generates every
-mixed partial of everything — most of it irrelevant to the goal — and the algebraic basic
-set has no way to tell which equations matter. Restricting the prolongation to `[hu]` does
-not rescue it either: the coordinate facts then never get prolonged, so `∂₁∂₁x` is unknown
-and the second-order expansion has free atoms in it.
-
-Both failures have the same cause and it is the one the differential machinery exists to
-address: **which prolongations to take is a ranking decision, and this tactic does not make
-it.** `CharSetTac/Diff/Ranking.lean` and `Diff/Coherence.lean` are where that belongs.
-
-So `wu_pde` is honestly scoped at first order in several derivations, which is exactly where
-Cauchy–Riemann lives, and the second-order case is evidence for the ranking work rather than
-a gap to paper over. -/
+This was recorded here as a *limit* — uniform prolongation supposedly generating too many
+mixed partials for the algebraic basic set to cope with. **That diagnosis was wrong.** The
+blocker was two missing simp lemmas leaving `d 1` and `d 2` alive as spurious atoms; see
+the note in `CharSetTac/DiffFrontendTest.lean`. With those fixed it proves, uniformly. -/
+example (d₁ d₂ : Derivation ℤ R R) (x y u : R)
+    (hx1 : d₁ x = 1) (hy1 : d₁ y = 0) (hx2 : d₂ x = 0) (hy2 : d₂ y = 1)
+    (hu : u = x ^ 2 - y ^ 2) :
+    d₁ (d₁ u) + d₂ (d₂ u) = 0 := by
+  wu_pde (derivs := [d₁, d₂]) (order := 2)
 
 /-! ### The numeral trap
 
 `hv : v = 2 * (x * y)` is what exposed it. `Derivation.leibniz` expands `d (2 * (x*y))` to
 `2 • d (x*y) + (x*y) • d 2`, and nothing in Mathlib's simp set kills that `d 2`:
 `Derivation.map_natCast` is stated for `Nat.cast n`, while a literal `2` elaborates to
-`OfNat.ofNat 2`.
+`OfNat.ofNat n`.
 
 The surviving `d 2` was then reflected as a *spurious atom* multiplied by `x*y`, so the
 equation for `d v` stopped being linear in the derivative and the characteristic set was
@@ -75,9 +60,15 @@ quietly wrong. The tactic reported only that the goal did not follow.
 
 `Wu.Derivation.map_ofNat` fixes it, and needs `no_index` on the literal — without that,
 `exact` finds the lemma but `simp` will not match it, because the `OfNat` instance path in
-a `CommRing` differs from the one `Nat.cast_ofNat` produces. -/
+a `CommRing` differs from the one `Nat.cast_ofNat` produces.
+
+The same class of bug bit `d 1`: the simp set carried the *ring-hom* `map_one`, which does
+not apply to a derivation at all. `Derivation.map_one_eq_zero` is the right lemma. Between
+them these two accounted for every "limit" this frontend had been credited with. -/
 
 example (d : Derivation ℤ R R) : d (2 : R) = 0 := by simp
+
+example (d : Derivation ℤ R R) : d (1 : R) = 0 := by simp
 
 example (d : Derivation ℤ R R) (x y : R) :
     d (2 * (x * y)) = 2 * (x * d y + y * d x) := by

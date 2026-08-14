@@ -58,7 +58,8 @@ not follow — which is why this is worth a named lemma rather than a simp-set t
 /-- The simp set that expands `δ` over ring operations. This is what removes the need for
 the engine to know anything about derivations. -/
 def derivExpandLemmas : List Name :=
-  [``map_add, ``map_sub, ``map_neg, ``map_zero, ``map_one,
+  [``map_add, ``map_sub, ``map_neg, ``map_zero,
+   ``Derivation.map_one_eq_zero, ``Derivation.map_ofNat, ``Derivation.map_natCast,
    ``Derivation.leibniz, ``Derivation.leibniz_pow, ``smul_eq_mul]
 
 /-- Prolong every equational hypothesis at the goal's type once, expanding with the
@@ -83,7 +84,8 @@ def prolongOnce : TacticM Unit := withMainContext do
       have $newId:ident := congrArg (fun z => z′) $hId:ident)
     evalTactic tac
     let simpTac ← `(tactic|
-      simp only [map_add, map_sub, map_neg, map_zero, map_one,
+      simp only [map_add, map_sub, map_neg, map_zero,
+        Derivation.map_one_eq_zero,
         Derivation.leibniz, Derivation.leibniz_pow, smul_eq_mul, nsmul_eq_mul,
         Derivation.map_ofNat, Derivation.map_natCast,
         Nat.cast_ofNat, Nat.add_one_sub_one] at $newId:ident)
@@ -128,7 +130,8 @@ def prolongOnceBy (dStx : TSyntax `term) (tag : Name) (only : Option (Array Name
       evalTactic (← `(tactic| have $newId:ident := congrArg (fun z => $dStx z) $hId:ident))
     catch _ => continue
     let simpTac ← `(tactic|
-      simp only [map_add, map_sub, map_neg, map_zero, map_one,
+      simp only [map_add, map_sub, map_neg, map_zero,
+        Derivation.map_one_eq_zero,
         Derivation.leibniz, Derivation.leibniz_pow, smul_eq_mul, nsmul_eq_mul,
         zsmul_eq_mul, Derivation.map_ofNat, Derivation.map_natCast,
         Nat.cast_ofNat, Nat.add_one_sub_one] at $newId:ident)

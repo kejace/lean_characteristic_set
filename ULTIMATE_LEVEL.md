@@ -70,10 +70,31 @@ That is most of the parts. What is missing is the *strategy* that uses them.
 5. **Cofactor tracking throughout**, so the certificate architecture is preserved. This is
    non-negotiable: the oracle stays untrusted and `ring1` stays the checker.
 
-### Gate
+### Gate — passed, but not for the reason predicted
 
-`CharSetTac/DiffPdeTest.lean`'s harmonicity example, currently documented as failing,
-proves. Plus: no regression in the existing differential corpus, and `#print axioms` clean.
+**Status: done.** `wu_pde!` in `CharSetTac/DiffDemand.lean`, tests in `DiffDemandTest.lean`.
+
+The gate was harmonicity at second order. It passes — but the diagnosis above was **wrong**,
+and that is worth keeping rather than editing away. The blocker was not prolongation
+strategy at all: it was two missing simp lemmas leaving `d 1` and `d 2` alive as spurious
+atoms, quietly corrupting the characteristic set. With those fixed, *uniform* prolongation
+proves harmonicity too — and so does the logistic equation, recorded much earlier in this
+project as a limit of `wu_diff` and never actually one.
+
+Demand-driven prolongation survives on measured merit instead:
+
+```
+wu_pde  (order := 2)   52027 heartbeats     30-odd equations generated
+wu_pde!                 4208                six
+```
+
+12×, and the gap widens with derivations and order. So it decides what stays tractable,
+even though it decided nothing on the gate it was built for.
+
+**Still open:** `d₁(d₁(d₁ u)) = 0` for a quadratic `u` does not close; the closure saturates
+at 18 hypotheses at any depth. Undiagnosed, and flagged as undiagnosed — the two previous
+"limits" in this project both turned out to be bugs with confident wrong explanations
+attached.
 
 ### Risk and abandon condition
 
