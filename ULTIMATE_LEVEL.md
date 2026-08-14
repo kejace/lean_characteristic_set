@@ -223,10 +223,32 @@ first bullet below and nothing more.
 4. **Consequences:** ACC; `completeCoherent` termination unconditional; finite decomposition
    into characteristic-set components.
 
-### Gate
+### Gate — steps 1 and 2 done, and step 2 turned out to be a different lemma
 
-Staged: (1) compiles and `{S}` has its closure properties; (2) the product lemma proves;
-(3) the basis theorem proves; (4) fuel disappears from `completeCoherent`'s signature.
+`CharSetTac/RadicalDiffIdeal.lean`.
+
+**Step 1 done.** `radicalDiffIdeal` as an intersection, with the closure laws
+(`subset`, `mono`, `idem`, the universal property) and `{S}` shown radical and differential.
+
+**Step 2 done, but not the lemma the plan named.** The plan called the product lemma
+`{S}·{T} ⊆ {S·T}` "the mathematical heart". On working through it, the more fundamental
+statement is **Ritt's lemma** — the radical of a differential ideal is differential — which
+is what makes `{S} = √([S])` and what the product lemma itself would be proved from. That is
+what is formalised: `IsDiffIdeal.radical`, via `IsDiffIdeal.step` and `IsDiffIdeal.iterate`.
+
+The indexing matters and is worth recording. The textbook induction produces
+`a^(n-k)·(da)^(2k-1)` and divides by `n - k`, which needs a side condition at the top of the
+range. Restating the step as
+
+    a^(m+1) · (da)^k ∈ I  →  a^m · (da)^(k+2) ∈ I
+
+divides by `m + 1`, which is *never* zero, so there is no case analysis at all. The
+`ℚ`-algebra hypothesis is exactly this division, and in characteristic `p` the lemma is
+false.
+
+**Steps 3 and 4 remain**: the product lemma, then Ritt–Raudenbush by Noetherian induction,
+then removing fuel from `completeCoherent`. Step 3 is now the only thing standing between
+here and the basis theorem.
 
 ### Risk
 

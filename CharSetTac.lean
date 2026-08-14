@@ -29,3 +29,4 @@ import CharSetTac.DerivationLocalization
 import CharSetTac.DerivationLocalizationExamples
 import CharSetTac.StructureSheafDeriv
 import CharSetTac.DiffSpec
+import CharSetTac.RadicalDiffIdeal
