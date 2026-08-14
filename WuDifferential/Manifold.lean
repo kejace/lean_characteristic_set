@@ -42,9 +42,15 @@ the theorems below be stated over a bare `CommRing` and instantiated here. Rings
 functions are precisely the rings one wants to instantiate a differential-algebra result
 at, so this was worth fixing rather than working around.
 
-Theorems that *do* carry nondegeneracy conditions still need a domain, and that is not an
-artefact: on a function ring the honest statement needs the multiplier to be a unit —
-nowhere vanishing — which is `Wu.eq_zero_of_isUnit_mul` in `CharSetTac/DiffSheaf.lean`.
+Theorems that *do* carry nondegeneracy conditions also reach manifolds, by a second route.
+`wu` checks whether the ring has `NoZeroDivisors`; when it does not, it cancels the
+multiplier by **unit-ness** instead, via `Wu.eq_zero_of_isUnit_mul`, and asks for `IsUnit I`
+rather than `I ≠ 0` on each initial. On a function ring that is the honest condition:
+nowhere vanishing, not merely not-the-zero-function. `x ≠ 0` really is too weak there — a
+bump function is nonzero and still kills things.
+
+So the domain assumption has gone from `wu` entirely. It is used when available and
+replaced by unit-ness when not.
 
 ## What this is not
 
@@ -87,6 +93,25 @@ theorem hyperbolic_commRing (u v : R) (h₁ : u′ = v) (h₂ : v′ = u) (h₁'
     (u′)′ = u := by
   wu
 
+/-! ### Conditional consequences, via unit multipliers
+
+These *do* have a nondegeneracy condition. On a domain it would read `a ≠ 0`; here it reads
+`IsUnit a`, which is what `wu` asks for once it sees the ring may have zero divisors. -/
+
+/-- Cancelling a unit, in a ring that need not be a domain. The multiplier `wu` produces is
+`a`, and unit-ness is exactly what licenses removing it. -/
+theorem cancel_unit_commRing (a x y : R) (ha : IsUnit a) (h : a * x = a * y) : x = y := by
+  wu
+
+/-- A scaled eigenfunction equation: `a y′ = a y` gives `y″ = y` when `a` is a unit.
+
+On `C^∞(M)` this says: if `a` is nowhere vanishing then it can be cancelled. Note that
+`a ≠ 0` would *not* be enough — a bump function is nonzero and vanishes somewhere, and the
+conclusion genuinely fails there. -/
+theorem eigen_scaled_commRing (a y : R) (ha : IsUnit a) (h : a * y′ = a * y)
+    (h' : a * (y′)′ = a * y′) : (y′)′ = y := by
+  wu
+
 end CommRingOnly
 
 /-! ### The bridge -/
@@ -122,6 +147,18 @@ theorem harmonic_smooth (X : Derivation ℝ C^∞⟮I, M; ℝ⟯ C^∞⟮I, M; �
     u′ = v → v′ = -u → (u′)′ = v′ → (u′)′ + u = 0 :=
   letI := differentialOfVectorField X
   fun h₁ h₂ h₁' => harmonic_commRing u v h₁ h₂ h₁'
+
+/-- **A conditional theorem reaching a manifold.**
+
+`a` nowhere vanishing — a unit in `C^∞⟮I, M; ℝ⟯` — is what licenses the cancellation. This
+is the case that used to be out of reach: `C^∞(M)` is not a domain, so the old `wu` could
+not state it at all, and `a ≠ 0` would have been the wrong hypothesis anyway. -/
+theorem eigen_scaled_smooth (X : Derivation ℝ C^∞⟮I, M; ℝ⟯ C^∞⟮I, M; ℝ⟯)
+    (a y : C^∞⟮I, M; ℝ⟯) (ha : IsUnit a) :
+    letI := differentialOfVectorField X
+    a * y′ = a * y → a * (y′)′ = a * y′ → (y′)′ = y :=
+  letI := differentialOfVectorField X
+  fun h h' => eigen_scaled_commRing a y ha h h'
 
 end Manifold
 

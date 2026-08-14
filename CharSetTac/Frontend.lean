@@ -139,6 +139,20 @@ def mkMultExpr (R : Expr) (atoms : Array Expr) (scale : Nat)
     acc ← mkAppM ``HMul.hMul #[acc, f]
   return acc
 
+/-- **The nowhere-vanishing multiplier principle.**
+
+If the multiplier `H` is a *unit* then `H * g = 0` gives `g = 0` in any commutative ring —
+no domain assumption, no continuity or density argument.
+
+This is what lets `wu` work on rings of functions. `C^∞(M)` is not a domain (bump functions
+with disjoint support multiply to zero), so the usual cancellation is unavailable; but the
+multipliers arising in geometry are things like `det g`, which are nowhere vanishing by
+definition and hence units. See `WuDifferential/Manifold.lean`. -/
+theorem eq_zero_of_isUnit_mul {R : Type*} [CommRing R] {H g : R}
+    (hH : IsUnit H) (h : H * g = 0) : g = 0 := by
+  obtain ⟨u, rfl⟩ := hH
+  simpa using congrArg (fun x => (↑u⁻¹ : R) * x) h
+
 /-- Split a nondegeneracy goal `L * I₁^e₁ * ⋯ ≠ 0` into one goal per initial, then
 discharge what we can: numeral factors by `norm_num`, and initials the user has already
 assumed nonzero by `assumption`. Whatever survives is a genuine degenerate configuration
@@ -170,6 +184,23 @@ def dischargeNondeg (factors : Array (Poly × Nat)) : TacticM Unit := do
   evalTactic (← `(tactic| all_goals try (repeat' constructor)))
   evalTactic (← `(tactic| all_goals try assumption))
   evalTactic (← `(tactic| all_goals try (apply sub_ne_zero.mpr; assumption)))
+
+/-- The `IsUnit` counterpart of `dischargeNondeg`, for rings that are not domains.
+
+Same structural split, mirroring `mkMultExpr`, but producing `IsUnit I` goals rather than
+`I ≠ 0`. On a function ring that is the honest condition: the multiplier must be invertible
+— nowhere vanishing — not merely not-the-zero-function. -/
+def dischargeUnits (factors : Array (Poly × Nat)) : TacticM Unit := do
+  let mut t : TSyntax `term ← `(?_)
+  for (_, e) in factors do
+    let f ← if e == 1 then `(?_) else `(IsUnit.pow _ ?_)
+    t ← `(IsUnit.mul $t $f)
+  evalTactic (← `(tactic| refine $t))
+  evalTactic (← `(tactic| all_goals try rw [← sub_eq_add_neg]))
+  evalTactic (← `(tactic| all_goals try assumption))
+  evalTactic (← `(tactic| all_goals try (ring_nf at * <;> assumption)))
+  evalTactic (← `(tactic| all_goals try norm_num))
+  evalTactic (← `(tactic| all_goals try assumption))
 
 /-- Split conjunctive hypotheses.
 
@@ -254,17 +285,48 @@ def wuCore (cfg : Config) (ref : Syntax) (suggest : Bool) : TacticM Unit := with
   -- most wants to instantiate at — rings of functions, where bump functions with disjoint
   -- support are zero divisors. See `WuDifferential/Manifold.lean`.
   let trivialMult := scale == 1 && factors.isEmpty
+  -- **How the multiplier gets cancelled depends on the ring.** In a domain, `M ≠ 0`
+  -- suffices. In a ring with zero divisors it does not, and the honest condition is that
+  -- `M` be a *unit* — for a function ring, nowhere vanishing rather than merely not the
+  -- zero function.
+  --
+  -- Decide by *running* the domain route rather than by asking whether `NoZeroDivisors R`
+  -- synthesizes. `mkAppM ``NoZeroDivisors #[R]` leaves the `[Mul R]`/`[Zero R]` arguments
+  -- as metavariables, so `trySynthInstance` answers `.undef` and every ring — including
+  -- one with `IsDomain` right there in the context — looks like a non-domain. Elaborating
+  -- the actual `refine` tests exactly the thing we care about and cannot drift from it.
   let keyTac ←
     if trivialMult then
       `(tactic| have wu_key : $lhsStx - $rhsStx = 0 := by linear_combination $combStx:term)
     else
       `(tactic|
         have wu_key : $Mstx * ($lhsStx - $rhsStx) = 0 := by linear_combination $combStx:term)
-  let finishTac ←
-    if trivialMult then
-      `(tactic| exact sub_eq_zero.mp wu_key)
+  let domainFinish ←
+    `(tactic| refine sub_eq_zero.mp ((mul_eq_zero_iff_left ?wu_nd).mp wu_key))
+  let unitFinish ←
+    `(tactic| refine sub_eq_zero.mp (Wu.eq_zero_of_isUnit_mul ?wu_nd wu_key))
+  evalTactic keyTac
+  -- `wu_key` must exist before the probe, so this runs after `keyTac`.
+  let usedDomain ←
+    if trivialMult then pure true
     else
-      `(tactic| refine sub_eq_zero.mp ((mul_eq_zero_iff_left ?wu_nd).mp wu_key))
+      withoutModifyingState do
+        try
+          evalTactic domainFinish
+          -- Succeeding is not enough. `refine` does not fail when an instance argument
+          -- cannot be synthesized — it postpones it as a goal — so a ring with zero
+          -- divisors sails through and only breaks later, in the discharger. Reject the
+          -- domain route if any class-instance goal survived; `?wu_nd : M ≠ 0` is not a
+          -- class, so the genuine side goal is not caught by this.
+          let mut ok := true
+          for g in ← getGoals do
+            if (← isClass? (← instantiateMVars (← g.getType))).isSome then ok := false
+          pure ok
+        catch _ => pure false
+  if trivialMult then
+    evalTactic (← `(tactic| exact sub_eq_zero.mp wu_key))
+  else if usedDomain then evalTactic domainFinish
+  else evalTactic unitFinish
   if suggest then
     -- The syntax used for elaboration wraps `Expr`s opaquely, which pretty-prints as
     -- `?m✝` and is useless to paste. Rebuild a display version from *delaborated*
@@ -289,27 +351,33 @@ def wuCore (cfg : Config) (ref : Syntax) (suggest : Bool) : TacticM Unit := with
     let subEqId := mkIdent ``sub_eq_zero
     let mulEqId := mkIdent ``mul_eq_zero_iff_left
     let mpId := mkIdent ``Iff.mp
+    let isUnitId := mkIdent ``Wu.eq_zero_of_isUnit_mul
     let script ←
       if trivialMult then
         `(tacticSeq|
           have $keyId:ident : $lhsDisp - $rhsDisp = 0 := by
             linear_combination $combDispStx:term
           exact $mpId $subEqId $keyId)
-      else
+      else if usedDomain then
         `(tacticSeq|
           have $keyId:ident : $Mdisp * ($lhsDisp - $rhsDisp) = 0 := by
             linear_combination $combDispStx:term
           refine $mpId $subEqId ($mpId ($mulEqId ?_) $keyId))
+      else
+        `(tacticSeq|
+          have $keyId:ident : $Mdisp * ($lhsDisp - $rhsDisp) = 0 := by
+            linear_combination $combDispStx:term
+          refine $mpId $subEqId ($isUnitId ?_ $keyId))
     Meta.Tactic.TryThis.addSuggestion ref script
     unless factors.isEmpty do
       let conds ← factors.mapM fun (I, _) => do
         return (← PrettyPrinter.delab (← polyToExpr R atoms I))
-      logInfo m!"wu: nondegeneracy conditions (each must be nonzero): {conds.map (·.raw)}"
-  evalTactic keyTac
-  evalTactic finishTac
-  -- With a trivial multiplier `finishTac` closes the goal outright, leaving nothing for
+      let what := if usedDomain then "nonzero" else "a unit (nowhere vanishing)"
+      logInfo m!"wu: nondegeneracy conditions (each must be {what}): {conds.map (·.raw)}"
+  -- With a trivial multiplier the finisher closed the goal outright, leaving nothing for
   -- the nondegeneracy discharger to act on.
-  unless trivialMult do dischargeNondeg factors
+  unless trivialMult do
+    if usedDomain then dischargeNondeg factors else dischargeUnits factors
 
 /-- `wu` proves an equational goal from equational hypotheses using Wu's characteristic
 set method, leaving any nondegeneracy conditions it cannot discharge as side goals.

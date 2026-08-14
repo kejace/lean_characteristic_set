@@ -91,17 +91,9 @@ theorem glue_eq (hsep : F.IsSeparated) {U : Opens X} {ι : Type} {V : ι → Ope
 
 end DiffPresheaf
 
-/-- **The nowhere-vanishing multiplier principle.**
-
-If the certificate's multiplier `H` is a *unit* — nowhere vanishing — then `H * g = 0`
-already gives `g = 0` with no density or continuity argument. This is why the Riemannian
-identities globalise for free: their multipliers are `det g` and its relatives, which are
-nonzero by the definition of a metric.
-
-Stated for an arbitrary commutative ring, so it applies to the sections over any open. -/
-theorem eq_zero_of_isUnit_mul {R : Type*} [CommRing R] {H g : R}
-    (hH : IsUnit H) (h : H * g = 0) : g = 0 := by
-  obtain ⟨u, rfl⟩ := hH
-  simpa using congrArg (fun x => (↑u⁻¹ : R) * x) h
+/-! **The nowhere-vanishing multiplier principle** — `Wu.eq_zero_of_isUnit_mul` — now lives
+in `CharSetTac/Frontend.lean`, because the tactic itself uses it: on a ring that is not a
+domain, `wu` cancels its multiplier by unit-ness rather than by `NoZeroDivisors`. It is
+still the statement this file needs, and is available through the import chain. -/
 
 end Wu
