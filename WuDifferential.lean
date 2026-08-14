@@ -8,3 +8,5 @@ import WuDifferential.PDEComparison
 import WuDifferential.Benchmark
 import WuDifferential.Manifold
 import WuDifferential.Surface
+import WuDifferential.SurfaceChristoffel
+import WuDifferential.SurfaceComparison
