@@ -35,5 +35,6 @@ import CharSetTac.DiffPolynomial
 import CharSetTac.DiffPolynomialExamples
 import CharSetTac.DiffPolynomialHeavy
 import CharSetTac.Variational
+import CharSetTac.JetContact
 import CharSetTac.RittRaudenbush
 import CharSetTac.MathlibableEvidence
