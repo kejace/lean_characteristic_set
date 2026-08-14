@@ -85,10 +85,19 @@ an instance of Mathlib's `Differential` — see candidate 4's open question. Bei
 (`RingTheory/WittVector/StructurePolynomial.lean`), so the `σ × ℕ` shape is Mathlib-native —
 different object, same encoding.
 
-**Call sites (6.0): K = 0.** Nothing outside the declaring file uses it; the root module
-imports it and nothing else. No inline re-derivation elsewhere. This *weakens* the case and is
-recorded honestly: the intended consumer (Ritt–Raudenbush) is not built yet. A Mathlib
-reviewer is entitled to ask "what uses this?", and today the answer is "nothing".
+**Call sites (6.0): K = 0 non-example consumers; 12 uses in
+[CharSetTac/DiffPolynomialExamples.lean](CharSetTac/DiffPolynomialExamples.lean).**
+
+Recorded honestly, because the distinction matters to a reviewer. The examples file exercises
+`DiffPolynomial`, `deriv`, `Y`, `evalDiff`, `evalDiff_deriv` and `evalDiff_unique` — including
+one case (`isDiffIdeal_expOde`) where `R{y}` and `IsDiffIdeal` meet, which is the
+Ritt–Raudenbush setting. But demonstrations are not consumers: the intended *consumer*
+(Ritt–Raudenbush itself) is not built yet, and no inline re-derivation of `R{y}` exists
+elsewhere in the project. A Mathlib reviewer is entitled to ask "what depends on this?", and
+today the honest answer is "the examples, and a theorem that isn't written yet".
+
+This is the one soft spot in candidate 1's case, and it is the reason to ship it together
+with candidate 4 rather than alone.
 
 **Cost.** Def + derivations + commutation: **CHEAP** (done, compiles). The universal property:
 **MODERATE** and *not* mechanical — `evalDiff` currently sends `y^(k) ↦ d^[k] (f i)`, and in
