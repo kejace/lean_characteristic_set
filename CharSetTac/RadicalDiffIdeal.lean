@@ -3,6 +3,7 @@ Copyright (c) 2026 Wu tactic contributors. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 -/
 import CharSetTac.DiffSpec
+import Mathlib.Algebra.Group.Pointwise.Set.Basic
 
 /-!
 # Radical differential ideals
@@ -22,6 +23,8 @@ in `Diff/Coherence.lean` and is fuel-bounded by design.
 -/
 
 namespace Wu
+
+open Pointwise
 
 variable {R A : Type*} [CommRing R] [CommRing A] [Algebra R A] {d : Derivation R A A}
 
@@ -183,5 +186,99 @@ theorem radicalDiffIdeal_eq_radical (S : Set A) (J : Ideal A)
     exact (Ideal.radical_mono hJK).trans radicalDiffIdeal.isRadical
 
 end Ritt
+
+section Product
+
+variable {I : Ideal A}
+
+/-! ### Toward Ritt–Raudenbush: the product lemma
+
+The step from Ritt's lemma to the basis theorem goes through `{S}·{T} ⊆ {S·T}`, and that in
+turn rests on one small fact about radical differential ideals. -/
+
+/-- **The key lemma.** In a radical differential ideal, `a·b ∈ I` forces `(da)·b ∈ I`.
+
+The trick is to multiply the Leibniz expansion of `d(ab)` by `b·da`: the cross term is a
+multiple of `ab`, so what survives is `(b·da)²`, and radicality finishes it. Note this needs
+no `ℚ` — only that `I` is radical and differential. -/
+theorem IsRadicalDiffIdeal.deriv_mul_mem (hI : IsRadicalDiffIdeal d I) {a b : A}
+    (h : a * b ∈ I) : d a * b ∈ I := by
+  have h1 : d (a * b) ∈ I := hI.2 _ h
+  rw [Derivation.leibniz] at h1
+  simp only [smul_eq_mul] at h1
+  have h2 := Ideal.mul_mem_right (b * d a) I h1
+  have h3 : (d b * d a) * (a * b) ∈ I := Ideal.mul_mem_left I _ h
+  have h4 : (d a * b) ^ 2 ∈ I := by
+    have hsub := Ideal.sub_mem I h2 h3
+    convert hsub using 1
+    ring
+  exact hI.1 ⟨2, h4⟩
+
+/-- The elements whose product with `t` lands in `I`. -/
+private def colon (I : Ideal A) (t : A) : Ideal A where
+  carrier := {x | x * t ∈ I}
+  zero_mem' := by simp
+  add_mem' hx hy := by simpa [add_mul] using Ideal.add_mem I hx hy
+  smul_mem' c x hx := by
+    simpa [smul_eq_mul, mul_assoc] using Ideal.mul_mem_left I c hx
+
+private theorem mem_colon {I : Ideal A} {t x : A} : x ∈ colon I t ↔ x * t ∈ I := Iff.rfl
+
+/-- **The colon of a radical differential ideal is radical and differential.**
+
+Radicality is a computation with `(x·t)^n = (x^n·t)·t^(n-1)`; differentiality is exactly
+`deriv_mul_mem`. This is the whole reason that lemma was worth isolating. -/
+private theorem isRadicalDiffIdeal_colon (hI : IsRadicalDiffIdeal d I) (t : A) :
+    IsRadicalDiffIdeal d (colon I t) := by
+  constructor
+  · intro x hx
+    obtain ⟨n, hn⟩ := hx
+    rw [mem_colon] at hn ⊢
+    rcases n with _ | m
+    · -- `x^0 · t = t ∈ I`, so `x · t ∈ I` outright; radicality is not needed
+      simp only [pow_zero, one_mul] at hn
+      exact Ideal.mul_mem_left I x hn
+    · refine hI.1 ⟨m + 1, ?_⟩
+      have hpow : (x * t) ^ (m + 1) = (x ^ (m + 1) * t) * t ^ m := by ring
+      rw [hpow]
+      exact Ideal.mul_mem_right _ _ hn
+  · intro x hx
+    rw [mem_colon] at hx ⊢
+    exact hI.deriv_mul_mem hx
+
+
+/-- `{S}` multiplied by a *generator* of `T` already lands in `{S·T}`.
+
+The colon construction does the work: `{x | x·t ∈ {S·T}}` is a radical differential ideal
+containing `S`, so it contains all of `{S}`. -/
+theorem mul_mem_of_mem_right {S T : Set A} {a t : A}
+    (ha : a ∈ radicalDiffIdeal d S) (ht : t ∈ T) :
+    a * t ∈ radicalDiffIdeal d (S * T) := by
+  have hle : radicalDiffIdeal d S ≤ colon (radicalDiffIdeal d (S * T)) t := by
+    refine radicalDiffIdeal.le_of_subset (fun s hs => ?_)
+      (isRadicalDiffIdeal_colon radicalDiffIdeal.isRadicalDiffIdeal t)
+    exact radicalDiffIdeal.subset (Set.mul_mem_mul hs ht)
+  exact hle ha
+
+/-- **The product lemma**: `{S} · {T} ⊆ {S · T}`.
+
+The same colon argument run a second time, now with the roles reversed: having shown
+`{S}·T ⊆ {S·T}`, the set `{y | y·a ∈ {S·T}}` is a radical differential ideal containing `T`
+for each `a ∈ {S}`, hence contains `{T}`. -/
+theorem radicalDiffIdeal_mul_le {S T : Set A} :
+    radicalDiffIdeal d S * radicalDiffIdeal d T ≤ radicalDiffIdeal d (S * T) := by
+  rw [Ideal.mul_le]
+  intro a ha b hb
+  have hle : radicalDiffIdeal d T ≤ colon (radicalDiffIdeal d (S * T)) a := by
+    refine radicalDiffIdeal.le_of_subset (fun t ht => ?_)
+      (isRadicalDiffIdeal_colon radicalDiffIdeal.isRadicalDiffIdeal a)
+    have h1 : a * t ∈ radicalDiffIdeal d (S * T) :=
+      mul_mem_of_mem_right (S := S) (T := T) ha ht
+    rw [mul_comm a t] at h1
+    exact h1
+  have key : b * a ∈ radicalDiffIdeal d (S * T) := hle hb
+  rwa [mul_comm b a] at key
+
+end Product
 
 end Wu
