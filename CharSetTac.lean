@@ -5,6 +5,8 @@ import CharSetTac.Attr
 import CharSetTac.Reflect
 import CharSetTac.Frontend
 import CharSetTac.Differential
+import CharSetTac.DiffIdeal
+import CharSetTac.DiffIdealTest
 import CharSetTac.Diff.Ranking
 import CharSetTac.Diff.Derivation
 import CharSetTac.Diff.Reduce
