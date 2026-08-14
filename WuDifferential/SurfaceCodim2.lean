@@ -133,6 +133,85 @@ theorem flat_normal_bundle_iff
     rw [h, mul_zero] at key
     exact (mul_eq_zero.mp key).resolve_left (pow_ne_zero 2 hW0)
 
+/-! ### The full commutator identity
+
+`normal_curvature` is the `(1,2)` entry. The other three complete the matrix statement
+
+```
+W² [A₁, A₂] = D · ⎛  F   G ⎞          D = det ⎛ E   F   G  ⎞
+                  ⎝ -E  -F ⎠                  ⎜ L₁  M₁  N₁ ⎟
+                                              ⎝ L₂  M₂  N₂ ⎠
+```
+
+Two structural facts are visible in the four right-hand sides. The matrix `⎛F G; -E -F⎞`
+has **trace zero**, as any commutator must — so `(2,2) = -(1,1)`, and `commutator_22` is
+proved from `commutator_11` rather than re-eliminated. And its **determinant is
+`-F² + EG = W`**, so it is invertible whenever the metric is: the four entries vanish
+together, exactly when `D` does. That is what makes `flat_normal_bundle_iff` a statement
+about the whole normal curvature and not just one component. -/
+
+/-- `(1,1)`: `W² [A₁,A₂]₁₁ = F · D`. -/
+theorem commutator_11 (E F G W L1 M1 N1 L2 M2 N2 a12 a21 b12 b21 : ℝ)
+    (ha12 : W * a12 = G * M1 - F * N1) (ha21 : W * a21 = -(F * L1) + E * M1)
+    (hb12 : W * b12 = G * M2 - F * N2) (hb21 : W * b21 = -(F * L2) + E * M2) :
+    W ^ 2 * (a12 * b21 - a21 * b12)
+      = F * (E * M1 * N2 - E * M2 * N1 - F * L1 * N2 + F * L2 * N1
+             + G * L1 * M2 - G * L2 * M1) := by
+  wu (vars := [E, F, G, W, L1, M1, N1, L2, M2, N2, a12, a21, b12, b21])
+
+/-- `(1,1)` by hand: two products. -/
+theorem commutator_11' (E F G W L1 M1 N1 L2 M2 N2 a12 a21 b12 b21 : ℝ)
+    (ha12 : W * a12 = G * M1 - F * N1) (ha21 : W * a21 = -(F * L1) + E * M1)
+    (hb12 : W * b12 = G * M2 - F * N2) (hb21 : W * b21 = -(F * L2) + E * M2) :
+    W ^ 2 * (a12 * b21 - a21 * b12)
+      = F * (E * M1 * N2 - E * M2 * N1 - F * L1 * N2 + F * L2 * N1
+             + G * L1 * M2 - G * L2 * M1) := by
+  have m1 : W ^ 2 * (a12 * b21) = (G * M1 - F * N1) * (-(F * L2) + E * M2) := by
+    linear_combination congrArg₂ (· * ·) ha12 hb21
+  have m2 : W ^ 2 * (a21 * b12) = (-(F * L1) + E * M1) * (G * M2 - F * N2) := by
+    linear_combination congrArg₂ (· * ·) ha21 hb12
+  linear_combination m1 - m2
+
+/-- `(2,2) = -(1,1)`: the commutator is trace-free, so this needs no elimination at all. -/
+theorem commutator_22 (E F G W L1 M1 N1 L2 M2 N2 a12 a21 b12 b21 : ℝ)
+    (ha12 : W * a12 = G * M1 - F * N1) (ha21 : W * a21 = -(F * L1) + E * M1)
+    (hb12 : W * b12 = G * M2 - F * N2) (hb21 : W * b21 = -(F * L2) + E * M2) :
+    W ^ 2 * (-(a12 * b21) + a21 * b12)
+      = -F * (E * M1 * N2 - E * M2 * N1 - F * L1 * N2 + F * L2 * N1
+              + G * L1 * M2 - G * L2 * M1) := by
+  linear_combination -commutator_11 E F G W L1 M1 N1 L2 M2 N2 a12 a21 b12 b21
+    ha12 ha21 hb12 hb21
+
+/-- `(2,1)`: `W² [A₁,A₂]₂₁ = -E · D`. -/
+theorem commutator_21 (E F G W L1 M1 N1 L2 M2 N2 a11 a21 a22 b11 b21 b22 : ℝ)
+    (ha11 : W * a11 = G * L1 - F * M1) (ha21 : W * a21 = -(F * L1) + E * M1)
+    (ha22 : W * a22 = -(F * M1) + E * N1)
+    (hb11 : W * b11 = G * L2 - F * M2) (hb21 : W * b21 = -(F * L2) + E * M2)
+    (hb22 : W * b22 = -(F * M2) + E * N2) :
+    W ^ 2 * (-(a11 * b21) + a21 * b11 - a21 * b22 + a22 * b21)
+      = -E * (E * M1 * N2 - E * M2 * N1 - F * L1 * N2 + F * L2 * N1
+              + G * L1 * M2 - G * L2 * M1) := by
+  wu (vars := [E, F, G, W, L1, M1, N1, L2, M2, N2, a11, a21, a22, b11, b21, b22])
+
+/-- `(2,1)` by hand: four products. -/
+theorem commutator_21' (E F G W L1 M1 N1 L2 M2 N2 a11 a21 a22 b11 b21 b22 : ℝ)
+    (ha11 : W * a11 = G * L1 - F * M1) (ha21 : W * a21 = -(F * L1) + E * M1)
+    (ha22 : W * a22 = -(F * M1) + E * N1)
+    (hb11 : W * b11 = G * L2 - F * M2) (hb21 : W * b21 = -(F * L2) + E * M2)
+    (hb22 : W * b22 = -(F * M2) + E * N2) :
+    W ^ 2 * (-(a11 * b21) + a21 * b11 - a21 * b22 + a22 * b21)
+      = -E * (E * M1 * N2 - E * M2 * N1 - F * L1 * N2 + F * L2 * N1
+              + G * L1 * M2 - G * L2 * M1) := by
+  have m1 : W ^ 2 * (a11 * b21) = (G * L1 - F * M1) * (-(F * L2) + E * M2) := by
+    linear_combination congrArg₂ (· * ·) ha11 hb21
+  have m2 : W ^ 2 * (a21 * b11) = (-(F * L1) + E * M1) * (G * L2 - F * M2) := by
+    linear_combination congrArg₂ (· * ·) ha21 hb11
+  have m3 : W ^ 2 * (a21 * b22) = (-(F * L1) + E * M1) * (-(F * M2) + E * N2) := by
+    linear_combination congrArg₂ (· * ·) ha21 hb22
+  have m4 : W ^ 2 * (a22 * b21) = (-(F * M1) + E * N1) * (-(F * L2) + E * M2) := by
+    linear_combination congrArg₂ (· * ·) ha22 hb21
+  linear_combination -m1 + m2 - m3 + m4
+
 /-! ### The Ricci equation
 
 `WuSurface.ricci_raw` gives the analytic half — pure Schwarz on `n₁`, no orthogonality
