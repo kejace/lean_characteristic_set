@@ -73,4 +73,33 @@ theorem stalkDeriv_mk (d : Derivation R A A) (P : PrimeSpectrum A) (r : A)
   simp only [stalkDeriv, Submonoid.coe_mul, map_mul, map_sub] at h ⊢
   linear_combination -h
 
+/-! ### Sections
+
+A section over `U` is a dependent function into the stalks that is *locally a fraction*.
+The derivation acts pointwise, and `stalkDeriv_mk` is exactly what keeps the predicate. -/
+
+/-- The pointwise action on dependent functions into the stalks. -/
+noncomputable def sectionDeriv (d : Derivation R A A)
+    {U : Opens (PrimeSpectrum.Top A)} (f : ∀ x : U, Localizations A x.1) :
+    ∀ x : U, Localizations A x.1 :=
+  fun x => stalkDeriv d x.1 (f x)
+
+/-- **The predicate survives.** If `f` is locally `r/s`, then `D f` is locally
+`(s·dr - r·ds)/s²` — on the *same* neighbourhood, with no shrinking. -/
+theorem sectionDeriv_mem (d : Derivation R A A) {U : Opens (PrimeSpectrum.Top A)}
+    {f : ∀ x : U, Localizations A x.1}
+    (hf : f ∈ StructureSheaf.sectionsSubalgebra (R := A) A U) :
+    sectionDeriv d f ∈ StructureSheaf.sectionsSubalgebra (R := A) A U := by
+  intro x
+  obtain ⟨V, m, i, r, s, w⟩ := hf x
+  refine ⟨V, m, i, s * d r - r * d s, s * s, fun y => ?_⟩
+  obtain ⟨hs, hw⟩ := w y
+  have hp : (y : PrimeSpectrum.Top A).asIdeal.IsPrime := (y : PrimeSpectrum.Top A).isPrime
+  refine ⟨fun hmem => (hp.mem_or_mem hmem).elim hs hs, ?_⟩
+  -- `hw` is stated about the composite; beta-reduce it to talk about `f (i y)`
+  have hw' : f (i y) = LocalizedModule.mk r ⟨s, hs⟩ := hw
+  show stalkDeriv d _ (f (i y)) = _
+  rw [hw']
+  exact stalkDeriv_mk d _ r ⟨s, hs⟩
+
 end Wu
