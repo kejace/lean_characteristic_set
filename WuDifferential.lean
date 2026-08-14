@@ -7,3 +7,4 @@ import WuDifferential.PDE
 import WuDifferential.PDEComparison
 import WuDifferential.Benchmark
 import WuDifferential.Manifold
+import WuDifferential.Surface
