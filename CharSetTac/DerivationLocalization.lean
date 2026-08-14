@@ -33,38 +33,24 @@ derivation is then read off the `ε`-component.
 
 ## Mathlib candidates
 
-Three of the pieces below are general-purpose and belong upstream rather than here:
-`TrivSqZeroExt.isUnit_of_isUnit_fst`, `Derivation.toDualHom`, and `Derivation.localization`
-itself.
+`Derivation.localization` is the piece that belongs upstream: `/mathlibable` found no
+`Derivation` × `Localization` interaction anywhere in Mathlib (grep, plus a Loogle query for
+`Derivation, IsLocalization`, which returns only
+`KaehlerDifferential.span_range_map_derivation_of_isLocalization`).
+
+`Derivation.toDualHom` and `TrivSqZeroExt.dualMap` are less clear-cut — Mathlib's
+`derivationToSquareZeroEquivLift` and `TrivSqZeroExt.kerIdeal`/`kerIdeal_sq` may already
+express them. See `MATHLIBABLE_REPORT.md`.
+
+A fourth candidate, `TrivSqZeroExt.isUnit_of_isUnit_fst`, turned out to be Mathlib's
+`TrivSqZeroExt.isUnit_iff_isUnit_fst` (strictly more general — arbitrary bimodule, not just
+`TrivSqZeroExt A A`) and has been deleted in favour of it.
 -/
 
 open TrivSqZeroExt
 
 -- These live in root namespaces on purpose: they are general-purpose statements about
 -- Mathlib types, and the intent is to upstream them.
-
-section Units
-
-variable {A : Type*} [CommRing A]
-
-/-- **A dual number is a unit exactly when its real part is.**
-
-`(u, v)⁻¹ = (u⁻¹, -u⁻²v)`, which is the usual expansion of `1/(u + vε)` truncated at `ε²`.
-Stated for a general square-zero extension, where it is no harder. -/
-theorem TrivSqZeroExt.isUnit_of_isUnit_fst {x : TrivSqZeroExt A A} (h : IsUnit x.fst) :
-    IsUnit x := by
-  obtain ⟨u, hu⟩ := h
-  -- the only fact `ring` cannot supply: `u⁻¹ · u⁻¹ · u = u⁻¹`
-  have key : (↑u⁻¹ : A) * (↑u⁻¹ : A) * (↑u : A) = (↑u⁻¹ : A) := by
-    rw [mul_assoc, Units.inv_mul, mul_one]
-  refine ⟨⟨x, inl (↑u⁻¹ : A) - inr (((↑u⁻¹ : A) * (↑u⁻¹ : A)) * x.snd), ?_, ?_⟩, rfl⟩ <;>
-    refine TrivSqZeroExt.ext ?_ ?_ <;>
-      simp [← hu, smul_eq_mul, Units.mul_inv, Units.inv_mul] <;>
-      first
-        | linear_combination (-x.snd) * key
-        | linear_combination x.snd * key
-
-end Units
 
 section ToDual
 
@@ -135,7 +121,7 @@ noncomputable def toDualLift (d : Derivation R A A) (B : Type*) [CommRing B] [Al
 reason the dual-number route avoids well-definedness. -/
 theorem toDualLift_isUnit (d : Derivation R A A) (S : Submonoid A) [IsLocalization S B]
     (s : S) : IsUnit (d.toDualLift B s) := by
-  apply TrivSqZeroExt.isUnit_of_isUnit_fst
+  apply TrivSqZeroExt.isUnit_iff_isUnit_fst.mpr
   simpa [toDualLift, TrivSqZeroExt.dualMap] using IsLocalization.map_units B s
 
 /-- The lift to `B →+* B[ε]` supplied by the universal property. -/
