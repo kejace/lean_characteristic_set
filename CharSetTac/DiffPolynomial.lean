@@ -97,10 +97,19 @@ theorem evalDiff_deriv (p : DiffPolynomial R σ) :
   | C r => simp [evalDiff]
   | add p q hp hq => simp [hp, hq]
   | mul_X p n hp =>
-      rw [Derivation.leibniz, map_add, map_mul, deriv_X, Derivation.leibniz]
-      simp only [smul_eq_mul, map_mul, evalDiff]
-      simp [Function.iterate_succ_apply']
-      ring
+      have hL : evalDiff dA f (deriv R σ (p * X n))
+          = evalDiff dA f p * evalDiff dA f (X (n.1, n.2 + 1))
+            + evalDiff dA f (X n) * evalDiff dA f (deriv R σ p) := by
+        rw [Derivation.leibniz, deriv_X]
+        simp only [smul_eq_mul, map_add, map_mul]
+      have hR : dA (evalDiff dA f (p * X n))
+          = evalDiff dA f p * dA (evalDiff dA f (X n))
+            + evalDiff dA f (X n) * dA (evalDiff dA f p) := by
+        rw [map_mul, Derivation.leibniz]
+        simp only [smul_eq_mul]
+      have hstep : evalDiff dA f (X (n.1, n.2 + 1)) = dA (evalDiff dA f (X n)) := by
+        simp only [evalDiff, aeval_X, Function.iterate_succ_apply']
+      rw [hL, hR, hp, hstep]
 
 /-- **Uniqueness.** Any `R`-algebra map that intertwines the derivations and agrees with `f`
 on the `y_i` is `evalDiff`. Together with `evalDiff_deriv` this pins `R{y}` down. -/
