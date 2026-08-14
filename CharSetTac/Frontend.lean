@@ -121,7 +121,7 @@ def collectHyps (R : Expr) (only : Option (Array Expr)) :
     if ldecl.isImplementationDetail then continue
     if let some sel := only then
       unless sel.any (· == ldecl.toExpr) do continue
-    let ty ← instantiateMVars ldecl.type
+    let ty := (← instantiateMVars ldecl.type).consumeMData
     match ty.eq? with
     | some (ty', a, b) =>
       if ← isDefEq ty' R then
@@ -175,7 +175,7 @@ apart first. -/
 partial def splitConjunctions : TacticM Unit := withMainContext do
   for ldecl in ← getLCtx do
     if ldecl.isImplementationDetail then continue
-    if (← instantiateMVars ldecl.type).isAppOf ``And then
+    if (← instantiateMVars ldecl.type).consumeMData.isAppOf ``And then
       let subgoals ← (← getMainGoal).cases ldecl.fvarId
       if h : subgoals.size = 1 then
         replaceMainGoal [subgoals[0].mvarId]
@@ -195,7 +195,10 @@ def wuCore (cfg : Config) (ref : Syntax) (suggest : Bool) : TacticM Unit := with
   preprocess
   withMainContext do
   let goal ← getMainGoal
-  let goalTy ← instantiateMVars (← goal.getType)
+  -- `.consumeMData` matters: tactics such as `simp` and `have` leave `mdata`
+  -- wrappers, which pretty-print transparently but are not applications, so `Expr.eq?`
+  -- silently returns `none` on them and `wu` would reject a perfectly good equation.
+  let goalTy := (← instantiateMVars (← goal.getType)).consumeMData
   let some (R, lhs, rhs) := goalTy.eq?
     | throwError "wu: the goal must be an equation `a = b`, got{indentExpr goalTy}"
   let hyps ← collectHyps R cfg.hyps

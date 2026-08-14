@@ -4,5 +4,6 @@ import CharSetTac.CharSet
 import CharSetTac.Attr
 import CharSetTac.Reflect
 import CharSetTac.Frontend
+import CharSetTac.Differential
 import CharSetTac.Test
 import CharSetTac.TestTactic
