@@ -123,10 +123,29 @@ derivative and formal adjoint. But Olver–Shakiban Corollary 2 gives, for our e
 before Thm 3.2 (needs a `Normal` typeclass carrying antiderivatives `∫du_i^(n)` as data —
 note a bare differential algebra is *not* normal, so the partials must be data, not derived).
 
-**(e) Ritt–Raudenbush, second half.** Primes in `R{y}` are finitely generated — the
-characteristic-set argument, i.e. where *this project's engine* already lives (minimal-rank
-element = characteristic set, pseudo-division = `Wu.prem`). Note which half is which: the
-abstract half we proved is the short one.
+**(e) Ritt–Raudenbush, second half — much cheaper than I first wrote.** I originally recorded
+this as "the characteristic-set argument". That was wrong, and wrong in the expensive
+direction. Kaplansky's proof needs **no** rankings, characteristic sets, Rosenfeld lemma, or
+DCC on autoreduced sets. It works with one differential indeterminate at a time, rank
+`(ord, deg) ∈ ℕ ×ₗ ℕ` (so `Prod.Lex` gives well-foundedness free), and rests on one lemma:
+
+> **Ritt reduction.** For `α ∈ A{x}` and any `f`, there are `m, n` and `g` of strictly smaller
+> rank with `lc(α)^m · sep(α)^n · f − g ∈ [α]`. *(Double induction: on `ord f`, then `deg f`,
+> using `α^{(k)} = sep(α)·x^{(r+k)} + T_k`.)*
+
+Then: `I` maximal non-finite-type is prime (**have it**); pick `α ∈ I ∖ J` of minimal rank;
+`lc(α), sep(α) ∉ I`; Ritt-reduce to get `a·I ⊆ ⟨α, J⟩`; and the product lemma (**have it**)
+closes it via `I² ⊆ ⟨α, J, e₁,…,e_r⟩ ⊆ I`. Char 0 enters once, at `α − (1/d)·x^{(r)}·sep(α)`.
+
+Cost: Ritt reduction ~200–400 lines, main argument ~150, plus the reindexing
+`R{y₁,…,y_n} ≅ (R{y₁,…,y_{n−1}}){y_n}` with transported derivation. Note the definitions must
+live on `MvPolynomial (σ × ℕ) R`, **not** on the reflected `Wu.Poly` the tactic uses.
+
+Characteristic sets belong to Rosenfeld–Gröbner decomposition, which is a different theorem —
+and one whose load-bearing step, **Lazard's lemma**, is the genuinely hard and historically
+fragile item in this area (BLOP's 1995 proof carried an unstated no-embedded-primes
+hypothesis, flagged by Morrison; six proofs exist and Boulier–Lemaire–Poteaux–Moreno Maza
+(2019) note that no one has yet audited which avoids it). Do not conflate the two.
 
 ---
 
@@ -166,9 +185,54 @@ What *is* usable today and worth leaning on: `KaehlerDifferential.mvPolynomialBa
 exact sequence `exact_mapBaseChange_map` (which *is* the horizontal/vertical splitting),
 `Derivation.Lie`, and `Module.Basis.exteriorPower`.
 
+**Two traps worth recording.**
+
+*Do not try to make a ranking a `MonomialOrder`.* Mathlib's only instance,
+`MonomialOrder.lex`, needs `WellFoundedGT` on the variable index. A differential ranking has
+`y < y' < y'' < ⋯` — order type ω, with infinite *ascending* chains — so `WellFoundedGT (σ × ℕ)`
+is false. The right object is Kolchin rank, the pair (leader, degree), which *is* well-ordered.
+Build `IsRanking` from scratch.
+
+*Do not try to state anything Noetherian about `R{y}`.* It genuinely isn't — `[x², (x')², …]`
+strictly increases. The literature's discipline is to reduce every question to
+`F[Θ_{≤v}Y]`, a polynomial ring in **finitely many** derivatives, which is Noetherian and
+where `MvPolynomial.isNoetherianRing` applies. Rosenfeld's lemma is precisely the theorem that
+licenses the reduction.
+
+**The single highest-leverage edit in this repo** is §2.2: generalise `DiffPolynomial.deriv`
+from an `R`-linear derivation to one extending a given derivation on `R`. It unblocks the
+variational converse, conservation laws with `x`-dependent densities, and Picard–Vessiot, all
+at once.
+
 ---
 
-## 6. An orthogonal track worth noting
+## 6. Adjacent territory: Picard–Vessiot
+
+Worth scoping because our differential-ideal stack pays into it directly, and because the
+cliff is unusually sharp.
+
+**Reachable.** van der Put–Singer Prop. 1.20 — a Picard–Vessiot ring exists, is unique up to
+differential isomorphism, and adds no constants. The construction is `k[X_ij, 1/det]` with
+`(X_ij)' = A·(X_ij)`, quotiented by a **maximal differential ideal** (Zorn). Prerequisites we
+already have or nearly have: `Derivation.localization` (vdPS Ex. 1.5(1d) — and Mathlib has no
+such thing, which is candidate 2 of `MATHLIBABLE_REPORT.md`); and vdPS Lemma 1.17(1), *a
+simple differential ring over ℚ has no zero divisors*, which is ~50 lines from our existing
+API. There is also a route to "maximal differential ideal ⟹ prime" that runs through **Ritt's
+lemma plus our reduction to primes** — a genuine payoff from the Ritt–Raudenbush stack.
+
+**Not reachable.** Everything past Prop. 1.20. Theorems 1.27/1.28/1.34 (the Galois group is an
+algebraic group; the torsor; the Galois correspondence) need linear algebraic groups, `G°`,
+`dim G`, `Lie(G)`, Lie–Kolchin, Rosenlicht invariants, and neutral Tannakian categories.
+Mathlib has none of these — `RepresentationTheory/Tannaka.lean` is finite groups only. That is
+a multi-year project belonging to Mathlib's algebraic-geometry effort, not to us.
+
+**Structural mismatch, stated plainly.** PV theory runs on a finitely generated *localized*
+polynomial ring with a twisted derivation, where `D` does **not** send a generator to another
+generator. So the `y^(k) ↦ y^(k+1)` combinatorics underlying Wu/Ritt/characteristic sets
+transfers essentially not at all. The one place our exact ring is the natural home is vdPS
+Exercise 1.35.4: `Frac(k{{y₁,…,y_n}})` is a PV extension with Galois group `GL_n(C)`.
+
+## 7. An orthogonal track worth noting
 
 Exterior differential systems have a core that is **finite-dimensional linear algebra**:
 tableaux `A ⊂ W ⊗ V*`, prolongation `A^(1) = ker(δ|_{A⊗V*})`, Cartan characters, and Cartan's
@@ -198,6 +262,23 @@ Bryant, *Notes on Exterior Differential Systems* ([arXiv:1405.3116](https://arxi
 Seiler, *Spencer Cohomology, Differential Equations, and Pommaret Bases* ([PDF](https://www.mathematik.uni-kassel.de/~seiler/Papers/PDF/Spencer2.pdf)) ·
 Hydon, *Partial Euler operators and the efficient inversion of Div* ([arXiv:2212.08455](https://arxiv.org/abs/2212.08455)) ·
 Ritt, *Differential Algebra*, AMS Colloq. 33 (1950) · Kolchin, *Differential Algebra and Algebraic Groups* (1973).
+
+## Coordination
+
+Upstream's own paper — Xiao, Shen, Guo, Wang, Zhi, *Formalizing Wu-Ritt Method in Lean 4*,
+[arXiv:2604.14912](https://arxiv.org/abs/2604.14912) (Apr 2026), which is
+`WuProver/lean_characteristic_set`, i.e. this fork's upstream — closes with future work:
+*"executable code extraction and extensions to differential polynomials."* That is this
+project. The overlap is total and the field is small; the differential scope here is worth
+raising with them directly rather than discovering the collision later.
+
+Their stated obstruction is worth knowing: their well-foundedness instance is
+`[Finite σ] : WellFoundedLT (TriangularSet σ R)`, and `σ × ℕ` is infinite. In the **ordinary**
+case that is recoverable — a weak differential triangular set has at most `|σ|` elements, one
+per differential indeterminate — but it needs the *differential* triangular-set predicate, not
+the raw one. In the partial case it needs the genuine Kolchin minimal-bad-sequence argument.
+
+---
 
 **One claim I am relaying rather than asserting.** The research agents searched for prior
 formalization of the variational bicomplex, the Euler operator on a differential algebra, jet

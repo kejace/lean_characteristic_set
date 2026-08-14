@@ -64,11 +64,17 @@ def isCoherent (t : MAtomTable) (ps : Array Poly) : Bool :=
 
 /-- **Completion.** Add nonzero Δ-remainders until none appear.
 
-The differential analogue of Buchberger's algorithm. `fuel` bounds the rounds: termination
-holds by the Ritt–Raudenbush basis theorem (the ascending chain of radical differential
-ideals stabilises), which is not formalised here, so exhausting the fuel returns the set
-reached so far and `isCoherent` will report it as incomplete rather than the caller
-silently believing otherwise. -/
+The differential analogue of Buchberger's algorithm. `fuel` bounds the rounds.
+
+Termination in the literature is **not** by the Ritt–Raudenbush basis theorem — an earlier
+version of this comment said it was, and that was wrong. Rosenfeld–Gröbner terminates by a
+well-founded order `≺_t` on its quadruples `(G, D, A, H)`: the rank of the triangular set
+decreases, or it stays equal and the pending set decreases under "replace one element by
+finitely many of strictly lower rank" (Hubert, *Notes on Triangular Sets II*, Def. 6.2 and
+Props. 6.3/6.5; Boulier–Lazard–Ollivier–Petitot, Props. 29–35). The basis theorem is not used.
+
+Neither order is formalised here, so exhausting the fuel returns the set reached so far and
+`isCoherent` reports it as incomplete rather than letting the caller believe otherwise. -/
 partial def completeCoherent (t : MAtomTable) (ps : Array Poly) (fuel : Nat := 20) :
     Array Poly :=
   match fuel with

@@ -28,13 +28,25 @@ The classical proof has two halves:
 
 1. **Reduction to primes** — every radical differential ideal has a finite basis as soon as
    every *prime* one does. This is `hasBasisProperty_of_prime` below, and it is proved.
-2. **Primes have finite bases** — the characteristic-set argument: choose an element of
-   minimal rank in the prime, pseudo-divide by it, and induct. Not proved here.
+2. **Primes have finite bases** — not proved here.
 
 Half 1 is where the closure operator earns its keep, and it runs entirely on
-`radicalDiffIdeal_mul_le` (`{S}·{T} ⊆ {S·T}`). Half 2 is where *this project's engine* lives —
-the minimal-rank element is a characteristic set and the pseudo-division is `Wu.prem`. Note
-which half is which: the abstract half is the one that is short.
+`radicalDiffIdeal_mul_le` (`{S}·{T} ⊆ {S·T}`).
+
+An earlier version of this docstring called half 2 "the characteristic-set argument", and
+said the minimal-rank element is a characteristic set and the pseudo-division is `Wu.prem`.
+**That was wrong**, and wrong in the expensive direction. Kaplansky's proof — the standard
+one, reproduced in Sam's notes — needs no rankings, no characteristic sets, no Rosenfeld
+lemma, and no descending-chain condition on autoreduced sets. It works with **one**
+differential indeterminate at a time, using the rank `(ord, deg) ∈ ℕ ×ₗ ℕ`, and rests on a
+single reduction lemma:
+
+> **Ritt reduction.** For `α ∈ A{x}` and any `f`, there are `m, n` and a `g` of strictly
+> smaller rank with `lc(α)^m · sep(α)^n · f − g ∈ [α]`.
+
+plus the induction `R{y₁,…,y_n} ≅ (R{y₁,…,y_{n−1}}){y_n}`. The characteristic-set machinery
+belongs to Rosenfeld–Gröbner decomposition, which is a different theorem. See `SCOPE.md` §3(e)
+for the corrected route and cost.
 
 ## `ℚ` is not needed here
 
