@@ -8,6 +8,8 @@ import CharSetTac.Differential
 import CharSetTac.Diff.Ranking
 import CharSetTac.Diff.Derivation
 import CharSetTac.Diff.Reduce
+import CharSetTac.Diff.MultiIndex
 import CharSetTac.Diff.Test
+import CharSetTac.Diff.TestMulti
 import CharSetTac.Test
 import CharSetTac.TestTactic
