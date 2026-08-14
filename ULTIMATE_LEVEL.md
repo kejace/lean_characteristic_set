@@ -141,8 +141,19 @@ That single lemma is the whole difficulty of item B, and it is classical and bou
 
 ### Gate
 
-A concrete differential ring — `ℚ{y}` with `δ`, or `ℚ[x]` with `d/dx` — instantiates
-`DiffPresheaf`, and `restrict_deriv` is proved rather than assumed.
+**Step 1 is done.** `CharSetTac/DerivationLocalization.lean`. `Derivation.localization`
+extends any `d : Derivation R A A` to `Derivation R B B` for `B` a localization of `A`,
+with `localization_algebraMap` (it restricts to `d`) and `localization_mk'` (the quotient
+rule `s²·d(a/s) = s·da - a·ds`, so it is demonstrably the intended map). Axioms clean.
+
+The dual-number route worked as designed: no representative was ever named, and
+`IsLocalization.lift` supplied well-definedness. The supporting pieces —
+`TrivSqZeroExt.isUnit_of_isUnit_fst`, `Derivation.toDualHom`, `TrivSqZeroExt.dualMap` —
+are all general-purpose and sit in root namespaces for upstreaming.
+
+Steps 2–4 (prime differential ideals, structure sheaf, discharging `DiffPresheaf`) remain.
+The gate for those is unchanged: a concrete differential ring instantiates `DiffPresheaf`
+with `restrict_deriv` proved rather than assumed.
 
 ### Risk
 

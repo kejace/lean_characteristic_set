@@ -25,3 +25,4 @@ import CharSetTac.BenchChecking
 import CharSetTac.DiffPdeTest
 import CharSetTac.DiffDemand
 import CharSetTac.DiffDemandTest
+import CharSetTac.DerivationLocalization
