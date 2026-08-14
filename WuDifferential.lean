@@ -1,3 +1,4 @@
 import WuDifferential.Basic
 import WuDifferential.Theorems
+import WuDifferential.Comparison
 import WuDifferential.Benchmark
