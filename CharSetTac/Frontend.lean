@@ -152,13 +152,20 @@ def dischargeNondeg (factors : Array (Poly × Nat)) : TacticM Unit := do
     let f ← if e == 1 then `(?_) else `(pow_ne_zero _ ?_)
     t ← `(mul_ne_zero $t $f)
   evalTactic (← `(tactic| refine $t))
+  -- `polyToExpr` emits differences as `a + -b`, so fold them back into `a - b` first:
+  -- otherwise neither `assumption` against a user's `x - y ≠ 0` nor `sub_ne_zero` can
+  -- match, since `sub_ne_zero` is stated about `?a - ?b`.
+  evalTactic (← `(tactic| all_goals try rw [← sub_eq_add_neg]))
   evalTactic (← `(tactic| all_goals try assumption))
+  -- A condition `x - y ≠ 0` is most naturally written by the user as `x ≠ y`.
+  evalTactic (← `(tactic| all_goals try (apply sub_ne_zero.mpr; assumption)))
   evalTactic (← `(tactic| all_goals try norm_num))
   -- `norm_num` may factor a product condition into a conjunction (`b * c ≠ 0` becomes
   -- `b ≠ 0 ∧ c ≠ 0`), so split those before the final `assumption` pass. It may also
   -- normalise a goal into exactly a hypothesis (`-a ≠ 0` to `a ≠ 0`).
   evalTactic (← `(tactic| all_goals try (repeat' constructor)))
   evalTactic (← `(tactic| all_goals try assumption))
+  evalTactic (← `(tactic| all_goals try (apply sub_ne_zero.mpr; assumption)))
 
 /-- Split conjunctive hypotheses.
 
@@ -178,8 +185,7 @@ partial def splitConjunctions : TacticM Unit := withMainContext do
 /-- Unfold `@[wu_unfold]` predicates and split the resulting conjunctions.
 
 Runs before reflection so that goals stated with geometric predicates reduce to the
-polynomial equations the engine understands. Both steps are `try`d: a goal already in
-polynomial form needs neither. -/
+polynomial equations the engine understands. -/
 def preprocess : TacticM Unit := do
   evalTactic (← `(tactic| try simp only [wu_unfold] at *))
   splitConjunctions

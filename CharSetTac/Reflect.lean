@@ -81,6 +81,11 @@ partial def toPoly (e : Expr) : AtomM Poly := do
   | (``HSub.hSub, #[_, _, _, _, a, b]) => return Poly.sub (← toPoly a) (← toPoly b)
   | (``HMul.hMul, #[_, _, _, _, a, b]) => return Poly.mul (← toPoly a) (← toPoly b)
   | (``Neg.neg, #[_, _, a]) => return Poly.neg (← toPoly a)
+  | (``HDiv.hDiv, #[_, _, _, _, a, b]) => do
+    -- division by a nonzero *numeral* is scaling by a rational; anything else is an atom
+    match ← getNumeral? b with
+    | some r => if r == 0 then atom e else return Poly.smul (1 / r) (← toPoly a)
+    | none => atom e
   | (``HPow.hPow, #[_, _, _, _, a, n]) => do
     match ← natLit? n with
     | some k => return Poly.pow (← toPoly a) k
