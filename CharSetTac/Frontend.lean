@@ -31,18 +31,48 @@ the remaining `M ≠ 0` goal decomposes through `mul_ne_zero`/`pow_ne_zero` into
 nondegeneracy condition per initial — which is what the user needs to see. Wu's method is
 only generically valid, and these conditions are exactly the degenerate configurations
 being excluded.
+
+## Syntax
+
+```lean
+wu                          -- default: Wu (weak) reduction, atom order by first appearance
+wu (algo := ritt)           -- Ritt (strong) reduction instead
+wu (vars := [x, y, z])      -- pin the variable order: earlier = freer parameter
+wu [h₁, h₂]                 -- use only these hypotheses
+wu?                         -- also print a self-contained, pasteable proof
+```
+
+The variable order matters: the engine treats *larger* indices as later/dependent, and a
+polynomial's main variable is its largest index. A bad order can make Wu's method slow or
+fail outright, so `(vars := ...)` is the escape hatch when first-appearance order is wrong.
+
+`set_option trace.wu true` reports the reflected polynomials and the computed
+characteristic set.
 -/
 
 open Lean Meta Elab Tactic Mathlib.Tactic
 
 namespace Wu
 
-/-- A hypothesis usable by `wu`: its local name and the polynomial `a - b`. -/
+initialize registerTraceClass `wu
+
+/-- A hypothesis usable by `wu`: its fvar and the polynomial `a - b`. -/
 structure HypInfo where
   /-- The fvar, so we can refer to it in the emitted `linear_combination`. -/
   fvar : Expr
+  /-- The user-facing name, used when printing a pasteable proof for `wu?`. -/
+  name : Name
   /-- `a - b` as a polynomial. -/
   poly : Poly
+
+/-- Configuration for `wu`. -/
+structure Config where
+  /-- Which reduction to use when building ascending sets. -/
+  mode : Mode := .wu
+  /-- If nonempty, pin these expressions to variable indices `0, 1, 2, …` in order. -/
+  vars : Array Expr := #[]
+  /-- If `some`, restrict to these hypotheses. -/
+  hyps : Option (Array Expr) := none
 
 /-- Scale a polynomial so all coefficients are integers, returning the scale used. -/
 def integralize (p : Poly) : Nat × Poly :=
@@ -51,13 +81,7 @@ def integralize (p : Poly) : Nat × Poly :=
 
 /-- The certificate, rewritten so every emitted polynomial has integer coefficients.
 
-Returns `(scale, factors, cofactors)` with
-
-`(scale * ∏ Iₖ^eₖ) * g = ∑ⱼ dⱼ * hⱼ`
-
-where every `Iₖ` and `dⱼ` has integer coefficients. Each factor is made integral by
-scaling, and the resulting constant is pushed onto the cofactors; then any remaining
-denominators in the cofactors are cleared by scaling the whole identity. -/
+Returns `(scale, factors, cofactors)` with `(scale * ∏ Iₖ^eₖ) * g = ∑ⱼ dⱼ * hⱼ`. -/
 def Certificate.integralForm (c : Certificate) :
     Nat × Array (Poly × Nat) × Array Poly :=
   -- Split the factors. A *constant* initial carries no nondegeneracy content — it is a
@@ -87,20 +111,24 @@ def Certificate.integralForm (c : Certificate) :
     p.foldl (init := acc) fun acc t => Nat.lcm acc t.coeff.den
   (l, factors, if l == 1 then cofs else cofs.map (Poly.smul (l : Rat)))
 
-/-- Collect hypotheses of the form `a = b` at type `R` from the local context. -/
-def collectHyps (R : Expr) : TacticM (Array (Expr × Expr × Expr)) := do
+/-- Collect hypotheses of the form `a = b` at type `R`, optionally restricted to a given
+set of fvars. -/
+def collectHyps (R : Expr) (only : Option (Array Expr)) :
+    TacticM (Array (Expr × Name × Expr × Expr)) := do
   let mut out := #[]
   for ldecl in ← getLCtx do
     if ldecl.isImplementationDetail then continue
+    if let some sel := only then
+      unless sel.any (· == ldecl.toExpr) do continue
     let ty ← instantiateMVars ldecl.type
     match ty.eq? with
     | some (ty', a, b) =>
       if ← isDefEq ty' R then
-        out := out.push (ldecl.toExpr, a, b)
+        out := out.push (ldecl.toExpr, ldecl.userName, a, b)
     | none => pure ()
   return out
 
-/-- Build the `M ≠ 0` side goal as `L * I₁^e₁ * ⋯ ≠ 0`, and emit it factored. -/
+/-- Build `M = L * I₁^e₁ * ⋯`, factored so that `M ≠ 0` decomposes. -/
 def mkMultExpr (R : Expr) (atoms : Array Expr) (scale : Nat)
     (factors : Array (Poly × Nat)) : MetaM Expr := do
   let mut acc ← mkIntLit R (scale : Int)
@@ -125,31 +153,40 @@ def dischargeNondeg : TacticM Unit := do
   -- so try `assumption` once more on whatever it left behind.
   evalTactic (← `(tactic| all_goals try assumption))
 
-/-- The core of the tactic. -/
-def wuCore (mode : Mode) : TacticM Unit := withMainContext do
+/-- The core of the tactic. With `suggest`, also print a self-contained pasteable proof. -/
+def wuCore (cfg : Config) (ref : Syntax) (suggest : Bool) : TacticM Unit := withMainContext do
   let goal ← getMainGoal
   let goalTy ← instantiateMVars (← goal.getType)
   let some (R, lhs, rhs) := goalTy.eq?
     | throwError "wu: the goal must be an equation `a = b`, got{indentExpr goalTy}"
-  let hyps ← collectHyps R
-  -- reflect everything in one `AtomM` run so atom indices are shared; `AtomM.run`
-  -- discards the final state, so read the atom list from inside the monad
+  let hyps ← collectHyps R cfg.hyps
+  if hyps.isEmpty then
+    throwError "wu: no usable hypotheses. `wu` needs hypotheses of the form `a = b` at \
+      the same type as the goal."
+  -- Reflect everything in one `AtomM` run so atom indices are shared. `AtomM.run`
+  -- discards the final state, so read the atom list from inside the monad. Configured
+  -- variables are interned first, which is what pins the variable order.
   let (hs, g, atoms) ← AtomM.run .instances do
-    let hs ← hyps.mapM fun (fv, a, b) => do
+    for v in cfg.vars do
+      let _ ← AtomM.addAtom v
+    let hs ← hyps.mapM fun (fv, nm, a, b) => do
       let pa ← toPoly a
       let pb ← toPoly b
-      return ({ fvar := fv, poly := Poly.sub pa pb } : HypInfo)
+      return ({ fvar := fv, name := nm, poly := Poly.sub pa pb } : HypInfo)
     let gl ← toPoly lhs
     let gr ← toPoly rhs
     let st ← get
     return (hs, Poly.sub gl gr, st.atoms)
   let hypPolys := hs.map (·.poly)
-  let some cert := solve mode hypPolys g
+  trace[wu] "hypotheses: {hypPolys.map (·.toString)}"
+  trace[wu] "goal polynomial: {g.toString}"
+  let some cert := solve cfg.mode hypPolys g
     | throwError "wu: Wu's method did not reduce the goal to zero.\n\
-        This means the goal does not follow generically from the hypotheses.\n\
-        Hypotheses used: {hypPolys.size}"
+        The goal does not follow generically from the {hypPolys.size} hypotheses used.\n\
+        If the variable order is wrong, try `wu (vars := [...])`; \
+        for the stronger reduction, `wu (algo := ritt)`."
+  trace[wu] "characteristic set: {cert.charSet.map (·.toString)}"
   let (scale, factors, cofs) := cert.integralForm
-  -- M = scale * ∏ Iₖ^eₖ, emitted factored so `M ≠ 0` decomposes
   let M ← mkMultExpr R atoms scale factors
   let Mstx ← Term.exprToSyntax M
   let lhsStx ← Term.exprToSyntax lhs
@@ -165,15 +202,93 @@ def wuCore (mode : Mode) : TacticM Unit := withMainContext do
       | none => pure piece
       | some c => `($c + $piece))
   let combStx := comb.getD (← `((0 : $(← Term.exprToSyntax R))))
-  evalTactic (← `(tactic|
-    have wu_key : $Mstx * ($lhsStx - $rhsStx) = 0 := by linear_combination $combStx:term))
-  evalTactic (← `(tactic|
-    refine sub_eq_zero.mp ((mul_eq_zero_iff_left ?wu_nd).mp wu_key)))
-  -- try to discharge the nondegeneracy conditions, leaving the rest to the user
+  let keyTac ← `(tactic|
+    have wu_key : $Mstx * ($lhsStx - $rhsStx) = 0 := by linear_combination $combStx:term)
+  let finishTac ← `(tactic|
+    refine sub_eq_zero.mp ((mul_eq_zero_iff_left ?wu_nd).mp wu_key))
+  if suggest then
+    -- The syntax used for elaboration wraps `Expr`s opaquely, which pretty-prints as
+    -- `?m✝` and is useless to paste. Rebuild a display version from *delaborated*
+    -- expressions and the hypotheses' real user-facing names.
+    let Mdisp ← PrettyPrinter.delab M
+    let lhsDisp ← PrettyPrinter.delab lhs
+    let rhsDisp ← PrettyPrinter.delab rhs
+    let mut combDisp : Option (TSyntax `term) := none
+    for (h, d) in hs.zip cofs do
+      if d.isZero then continue
+      let dDisp ← PrettyPrinter.delab (← polyToExpr R atoms d)
+      let hIdent := mkIdent h.name
+      let piece ← `($dDisp * $hIdent)
+      combDisp := some (← match combDisp with
+        | none => pure piece
+        | some c => `($c + $piece))
+    let combDispStx := combDisp.getD (← `(0))
+    -- Use `mkIdent` rather than quotation-literal names: identifiers written inside a
+    -- quotation are hygienic and render with `✝` markers, which would make the printed
+    -- proof un-pasteable — the one thing `wu?` exists to provide.
+    let keyId := mkIdent (Name.mkSimple "wu_key")
+    let subEqId := mkIdent ``sub_eq_zero
+    let mulEqId := mkIdent ``mul_eq_zero_iff_left
+    let mpId := mkIdent ``Iff.mp
+    let script ← `(tacticSeq|
+      have $keyId:ident : $Mdisp * ($lhsDisp - $rhsDisp) = 0 := by
+        linear_combination $combDispStx:term
+      refine $mpId $subEqId ($mpId ($mulEqId ?_) $keyId))
+    Meta.Tactic.TryThis.addSuggestion ref script
+    unless factors.isEmpty do
+      let conds ← factors.mapM fun (I, _) => do
+        return (← PrettyPrinter.delab (← polyToExpr R atoms I))
+      logInfo m!"wu: nondegeneracy conditions (each must be nonzero): {conds.map (·.raw)}"
+  evalTactic keyTac
+  evalTactic finishTac
   dischargeNondeg
 
 /-- `wu` proves an equational goal from equational hypotheses using Wu's characteristic
-set method, leaving any nondegeneracy conditions it cannot discharge as side goals. -/
-elab "wu" : tactic => wuCore .wu
+set method, leaving any nondegeneracy conditions it cannot discharge as side goals.
+
+`wu?` additionally prints a self-contained proof that does not depend on the oracle. -/
+-- `atomic` on the `(keyword` prefixes so the parser can backtrack: without it, seeing
+-- `(` commits to the `algo` branch and `wu (vars := ...)` fails to parse.
+--
+-- `wu?` is a single token rather than `wu` followed by an optional `?`, matching the
+-- convention of `exact?`/`apply?`: as two tokens the optional-atom capture does not bind
+-- and the elaborator never fires.
+syntax (name := wuTac) "wu"
+  (atomic(" (" &"algo") " := " ident ")")?
+  (atomic(" (" &"vars") " := " "[" term,* "]" ")")?
+  (" [" term,* "]")? : tactic
+
+@[inherit_doc wuTac]
+syntax (name := wuTacQ) "wu?"
+  (atomic(" (" &"algo") " := " ident ")")?
+  (atomic(" (" &"vars") " := " "[" term,* "]" ")")?
+  (" [" term,* "]")? : tactic
+
+/-- Build a `Config` from the optional syntax pieces shared by `wu` and `wu?`. -/
+def mkConfig (algo : Option Syntax.Ident) (vs : Option (Syntax.TSepArray `term ","))
+    (hs : Option (Syntax.TSepArray `term ",")) : TacticM Config := do
+  let mut cfg : Config := {}
+  if let some a := algo then
+    match a.getId.toString with
+    | "wu" => cfg := { cfg with mode := .wu }
+    | "ritt" => cfg := { cfg with mode := .ritt }
+    | s => throwErrorAt a "wu: unknown algorithm `{s}`; expected `wu` or `ritt`"
+  if let some vsyn := vs then
+    let mut es := #[]
+    for v in vsyn.getElems do
+      es := es.push (← Term.elabTerm v none)
+    cfg := { cfg with vars := es }
+  if let some hsyn := hs then
+    let mut fvs := #[]
+    for h in hsyn.getElems do
+      fvs := fvs.push (← Term.elabTerm h none)
+    cfg := { cfg with hyps := some fvs }
+  return cfg
+
+elab_rules : tactic
+  | `(tactic| wu $[(algo := $algo:ident)]? $[(vars := [$vs,*])]? $[[$hs,*]]?) => do
+    wuCore (← mkConfig algo vs hs) (← getRef) false
+  | `(tactic| wu? $[(algo := $algo:ident)]? $[(vars := [$vs,*])]? $[[$hs,*]]?) => do
+    wuCore (← mkConfig algo vs hs) (← getRef) true
 
 end Wu
