@@ -159,6 +159,10 @@ def dischargeNondeg (factors : Array (Poly × Nat)) : TacticM Unit := do
   evalTactic (← `(tactic| all_goals try assumption))
   -- A condition `x - y ≠ 0` is most naturally written by the user as `x ≠ y`.
   evalTactic (← `(tactic| all_goals try (apply sub_ne_zero.mpr; assumption)))
+  -- Normalise both goal and context to a common form before matching: the emitted
+  -- multiplier and the user's hypothesis are often equal only up to ring normalisation
+  -- (`2*(E*G) + -(2*F^2)` versus `2*(E*G) - 2*F^2`).
+  evalTactic (← `(tactic| all_goals try (ring_nf at * <;> assumption)))
   evalTactic (← `(tactic| all_goals try norm_num))
   -- `norm_num` may factor a product condition into a conjunction (`b * c ≠ 0` becomes
   -- `b ≠ 0 ∧ c ≠ 0`), so split those before the final `assumption` pass. It may also

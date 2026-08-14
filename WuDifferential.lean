@@ -1,6 +1,8 @@
 import WuDifferential.Basic
 import WuDifferential.Theorems
 import WuDifferential.Comparison
+import WuDifferential.Lie
+import WuDifferential.Curvature
 import WuDifferential.PDE
 import WuDifferential.PDEComparison
 import WuDifferential.Benchmark
