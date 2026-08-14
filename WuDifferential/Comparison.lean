@@ -36,26 +36,31 @@ open scoped Differential
 
 namespace WuDiff.ByHand
 
+/-- Differentiating an equation. Stated locally rather than imported from `Wu`, so that
+nothing in this file depends on the tactic's library. -/
+private theorem dcongr {R : Type*} [CommRing R] [Differential R] {a b : R} (h : a = b) :
+    a′ = b′ := by rw [h]
+
 variable {R : Type*} [CommRing R] [IsDomain R] [CharZero R] [Differential R]
 
 /-! ### Elementary ODE consequences -/
 
 /-- Compare: `WuDiff.exp_second`. -/
 theorem exp_second (y : R) (h : y′ = y) : (y′)′ = y := by
-  have h' : (y′)′ = y′ := Wu.deriv_congr h
+  have h' : (y′)′ = y′ := dcongr h
   exact h'.trans h
 
 /-- Compare: `WuDiff.sq_second`. -/
 theorem sq_second (y : R) (h : y′ = y ^ 2) : (y′)′ = 2 * y ^ 3 := by
   have h' : (y′)′ = 2 * y * y′ := by
-    rw [Wu.deriv_congr h, pow_two, deriv_mul]; ring
+    rw [dcongr h, pow_two, deriv_mul]; ring
   rw [h', h]; ring
 
 /-- Compare: `WuDiff.logistic_second`. -/
 theorem logistic_second (y : R) (h : y′ = y * (1 - y)) :
     (y′)′ = y * (1 - y) * (1 - 2 * y) := by
   have h' : (y′)′ = y′ - 2 * y * y′ := by
-    rw [Wu.deriv_congr h]
+    rw [dcongr h]
     simp only [mul_sub, mul_one, map_sub, deriv_mul]
     ring
   rw [h', h]; ring
@@ -120,7 +125,7 @@ theorem lotka_volterra_io (x y α β γ δ : R)
     (hx : x′ = x * (α - β * y)) (hy : y′ = y * (δ * x - γ)) :
     x * (x′)′ - x′ * x′ + x * (α * x - x′) * (δ * x - γ) = 0 := by
   have hx' : (x′)′ = x′ * (α - β * y) - x * (β * y′) := by
-    rw [Wu.deriv_congr hx, deriv_mul, map_sub, deriv_mul, hα, hβ]
+    rw [dcongr hx, deriv_mul, map_sub, deriv_mul, hα, hβ]
     ring
   rw [hx', hy, hx]; ring
 
