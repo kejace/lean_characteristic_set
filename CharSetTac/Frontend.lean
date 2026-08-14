@@ -3,6 +3,7 @@ Copyright (c) 2026 Wu tactic contributors. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 -/
 import CharSetTac.Reflect
+import CharSetTac.Attr
 import Mathlib.Tactic.LinearCombination
 
 /-!
@@ -142,19 +143,51 @@ def mkMultExpr (R : Expr) (atoms : Array Expr) (scale : Nat)
 discharge what we can: numeral factors by `norm_num`, and initials the user has already
 assumed nonzero by `assumption`. Whatever survives is a genuine degenerate configuration
 the user must rule out, and is left as a side goal. -/
-def dischargeNondeg : TacticM Unit := do
-  evalTactic (← `(tactic|
-    repeat' first
-      | apply mul_ne_zero
-      | apply pow_ne_zero))
+def dischargeNondeg (factors : Array (Poly × Nat)) : TacticM Unit := do
+  -- Split structurally, mirroring how `mkMultExpr` associated the product, rather than
+  -- by blind `repeat' apply`. Applying `pow_ne_zero` by search unifies against non-powers
+  -- (via `npowRec`) and produces junk goals like `¬npowRec 0 x = 0`.
+  let mut t : TSyntax `term ← `(?_)
+  for (_, e) in factors do
+    let f ← if e == 1 then `(?_) else `(pow_ne_zero _ ?_)
+    t ← `(mul_ne_zero $t $f)
+  evalTactic (← `(tactic| refine $t))
   evalTactic (← `(tactic| all_goals try assumption))
   evalTactic (← `(tactic| all_goals try norm_num))
-  -- `norm_num` may normalise a goal into exactly a hypothesis (e.g. `-a ≠ 0` to `a ≠ 0`),
-  -- so try `assumption` once more on whatever it left behind.
+  -- `norm_num` may factor a product condition into a conjunction (`b * c ≠ 0` becomes
+  -- `b ≠ 0 ∧ c ≠ 0`), so split those before the final `assumption` pass. It may also
+  -- normalise a goal into exactly a hypothesis (`-a ≠ 0` to `a ≠ 0`).
+  evalTactic (← `(tactic| all_goals try (repeat' constructor)))
   evalTactic (← `(tactic| all_goals try assumption))
+
+/-- Split conjunctive hypotheses.
+
+Geometric predicates like `Midpoint` unfold to `p ∧ q` (one equation per coordinate), and
+`wu` only consumes hypotheses that are equations, so the conjunctions have to be taken
+apart first. -/
+partial def splitConjunctions : TacticM Unit := withMainContext do
+  for ldecl in ← getLCtx do
+    if ldecl.isImplementationDetail then continue
+    if (← instantiateMVars ldecl.type).isAppOf ``And then
+      let subgoals ← (← getMainGoal).cases ldecl.fvarId
+      if h : subgoals.size = 1 then
+        replaceMainGoal [subgoals[0].mvarId]
+        splitConjunctions
+      return
+
+/-- Unfold `@[wu_unfold]` predicates and split the resulting conjunctions.
+
+Runs before reflection so that goals stated with geometric predicates reduce to the
+polynomial equations the engine understands. Both steps are `try`d: a goal already in
+polynomial form needs neither. -/
+def preprocess : TacticM Unit := do
+  evalTactic (← `(tactic| try simp only [wu_unfold] at *))
+  splitConjunctions
 
 /-- The core of the tactic. With `suggest`, also print a self-contained pasteable proof. -/
 def wuCore (cfg : Config) (ref : Syntax) (suggest : Bool) : TacticM Unit := withMainContext do
+  preprocess
+  withMainContext do
   let goal ← getMainGoal
   let goalTy ← instantiateMVars (← goal.getType)
   let some (R, lhs, rhs) := goalTy.eq?
@@ -241,7 +274,7 @@ def wuCore (cfg : Config) (ref : Syntax) (suggest : Bool) : TacticM Unit := with
       logInfo m!"wu: nondegeneracy conditions (each must be nonzero): {conds.map (·.raw)}"
   evalTactic keyTac
   evalTactic finishTac
-  dischargeNondeg
+  dischargeNondeg factors
 
 /-- `wu` proves an equational goal from equational hypotheses using Wu's characteristic
 set method, leaving any nondegeneracy conditions it cannot discharge as side goals.
