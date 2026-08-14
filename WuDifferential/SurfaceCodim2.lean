@@ -133,4 +133,54 @@ theorem flat_normal_bundle_iff
     rw [h, mul_zero] at key
     exact (mul_eq_zero.mp key).resolve_left (pow_ne_zero 2 hW0)
 
+/-! ### The Ricci equation
+
+`WuSurface.ricci_raw` gives the analytic half — pure Schwarz on `n₁`, no orthogonality
+needed:
+
+```
+∂_v s₁ - ∂_u s₂ = ⟪(n₁)_u, (n₂)_v⟫ - ⟪(n₁)_v, (n₂)_u⟫
+```
+
+Expanding the right-hand side in the frame, the `n`-components contribute
+`s₁·(-s₂) + s₂·(s₁) = 0` — the connection form cancels out of its own curvature — and the
+tangential parts are governed by the Weingarten relations `α₁E + α₂F = -L₁` and friends.
+`hraw` below is that expansion.
+
+**The elimination here is linear, and that is worth stating.** The Ricci equation is
+*linear* in the shape operator, so the multiplier is `W`, not `W²`. Only the identity
+relating it to the commutator `[A₁, A₂]` — `normal_curvature` above — is quadratic. So
+within codimension two the two equations sit on opposite sides of the line drawn in the
+module docstring, which makes them a useful pair to have side by side. -/
+
+/-- **The Ricci equation, by `wu`.**
+
+`W (∂_v s₁ - ∂_u s₂) = det ⎛E F G; L₁ M₁ N₁; L₂ M₂ N₂⎞`.
+
+The curvature of the normal connection is the same `3 × 3` determinant that governs
+`normal_curvature`. Combined with `flat_normal_bundle_iff`, that closes the circle: the
+normal connection is flat, the determinant vanishes, and the shape operators commute are
+all the same condition. -/
+theorem ricci_equation (E F G W L1 M1 N1 L2 M2 N2 α₁ α₂ β₁ β₂ Rs : ℝ)
+    (hα1 : W * α₁ = -(G * L1 - F * M1)) (hα2 : W * α₂ = -(-(F * L1) + E * M1))
+    (hβ1 : W * β₁ = -(G * M1 - F * N1)) (hβ2 : W * β₂ = -(-(F * M1) + E * N1))
+    (hraw : Rs = -(α₁ * M2) - α₂ * N2 + β₁ * L2 + β₂ * M2) :
+    W * Rs = E * (M1 * N2 - M2 * N1) - F * (L1 * N2 - L2 * N1)
+             + G * (L1 * M2 - L2 * M1) := by
+  wu (vars := [E, F, G, W, L1, M1, N1, L2, M2, N2, Rs, α₁, α₂, β₁, β₂])
+
+/-- The Ricci equation by hand. Compare `ricci_equation`.
+
+Shorter than `normal_curvature'` — and that is the point of including both. Because the
+shape operator enters *linearly*, no products have to be built: substituting `W` through
+the raw relation is enough, and the four cleared relations go in with the coefficients
+`-M₂, -N₂, L₂, M₂` read straight off `hraw`. -/
+theorem ricci_equation' (E F G W L1 M1 N1 L2 M2 N2 α₁ α₂ β₁ β₂ Rs : ℝ)
+    (hα1 : W * α₁ = -(G * L1 - F * M1)) (hα2 : W * α₂ = -(-(F * L1) + E * M1))
+    (hβ1 : W * β₁ = -(G * M1 - F * N1)) (hβ2 : W * β₂ = -(-(F * M1) + E * N1))
+    (hraw : Rs = -(α₁ * M2) - α₂ * N2 + β₁ * L2 + β₂ * M2) :
+    W * Rs = E * (M1 * N2 - M2 * N1) - F * (L1 * N2 - L2 * N1)
+             + G * (L1 * M2 - L2 * M1) := by
+  linear_combination W * hraw - M2 * hα1 - N2 * hα2 + L2 * hβ1 + M2 * hβ2
+
 end WuCodim2
