@@ -3,6 +3,7 @@ Copyright (c) 2026 Wu tactic contributors. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 -/
 import CharSetTac.DerivationLocalization
+import CharSetTac.DiffSheaf
 import Mathlib.AlgebraicGeometry.StructureSheaf
 
 /-!
@@ -101,5 +102,99 @@ theorem sectionDeriv_mem (d : Derivation R A A) {U : Opens (PrimeSpectrum.Top A)
   show stalkDeriv d _ (f (i y)) = _
   rw [hw']
   exact stalkDeriv_mk d _ r ⟨s, hs⟩
+
+/-! ### Sections as a ring, pointwise
+
+Every ring operation on sections is inherited from the product, hence pointwise, hence
+`rfl`. Establishing that *first* is what makes the rest cheap: the derivation's proof
+obligations then reduce to facts about a single stalk, and nothing ever has to unfold the
+sheafification. Proving them the other way round runs `whnf` into the ground. -/
+
+section Presheaf
+
+open CategoryTheory Opposite
+
+variable {U : Opens (PrimeSpectrum.Top A)}
+
+/-- Sections of the structure sheaf over `U`. -/
+noncomputable abbrev Sections (A : Type*) [CommRing A] (U : Opens (PrimeSpectrum.Top A)) :
+    Type _ :=
+  (AlgebraicGeometry.structureSheafInType A A).1.obj (op U)
+
+@[simp] theorem sections_mul_apply (f g : Sections A U) (x : (op U).unop) :
+    (f * g).1 x = f.1 x * g.1 x := rfl
+
+@[simp] theorem sections_add_apply (f g : Sections A U) (x : (op U).unop) :
+    (f + g).1 x = f.1 x + g.1 x := rfl
+
+@[simp] theorem sections_one_apply (x : (op U).unop) : (1 : Sections A U).1 x = 1 := rfl
+
+@[simp] theorem sections_algebraMap_apply (a : A) (x : (op U).unop) :
+    (algebraMap A (Sections A U) a).1 x = algebraMap A (Localizations A x.1) a := rfl
+
+/-- The `R`-algebra structure on sections, as the composite `R → A → 𝒪(U)`.
+
+Deliberately not an instance: sections already carry an `A`-algebra structure and a second
+global one would be a diamond. `DiffPresheaf` bundles the algebra as a field for exactly
+this reason. -/
+noncomputable def sectionsAlgebra (R : Type*) [CommRing R] (A : Type*) [CommRing A]
+    [Algebra R A] (U : Opens (PrimeSpectrum.Top A)) : Algebra R (Sections A U) :=
+  ((algebraMap A (Sections A U)).comp (algebraMap R A)).toAlgebra
+
+/-- **The derivation on sections of `𝒪_{Spec A}`.** `stalkDeriv` applied pointwise, landing
+back in the sections by `sectionDeriv_mem`.
+
+Every proof obligation is discharged at a single stalk, via the pointwise lemmas above. -/
+noncomputable def sheafDeriv (d : Derivation R A A) (U : Opens (PrimeSpectrum.Top A)) :
+    letI := sectionsAlgebra R A U
+    Derivation R (Sections A U) (Sections A U) :=
+  letI := sectionsAlgebra R A U
+  { toFun := fun f => ⟨sectionDeriv d f.1, sectionDeriv_mem d f.2⟩
+    map_add' := fun f g => Subtype.ext (funext fun x => map_add (stalkDeriv d x.1) _ _)
+    map_smul' := fun r f => Subtype.ext (funext fun x => by
+      -- the `R`-action is by a constant from `A`, which the derivation annihilates
+      have hc : ((algebraMap R (Sections A U)) r).1 x
+          = algebraMap A (Localizations A x.1) (algebraMap R A r) := rfl
+      show stalkDeriv d x.1 (((algebraMap R (Sections A U)) r).1 x * f.1 x)
+        = ((algebraMap R (Sections A U)) r).1 x * stalkDeriv d x.1 (f.1 x)
+      rw [Derivation.leibniz, hc]
+      simp [stalkDeriv, Derivation.localization_algebraMap, Derivation.map_algebraMap,
+        smul_eq_mul])
+    map_one_eq_zero' := Subtype.ext (funext fun x => (stalkDeriv d x.1).map_one_eq_zero)
+    leibniz' := fun f g => Subtype.ext (funext fun x => by
+      show stalkDeriv d x.1 (f.1 x * g.1 x) = _
+      rw [Derivation.leibniz]
+      simp only [smul_eq_mul]
+      rfl) }
+
+/-- Restriction of sections along an inclusion of opens. Every ring-hom field is `rfl`,
+because restriction is precomposition with an inclusion of primes. -/
+noncomputable def sectionsRestrict {U V : Opens (PrimeSpectrum.Top A)} (h : V ≤ U) :
+    Sections A U →+* Sections A V where
+  toFun := (AlgebraicGeometry.structureSheafInType A A).1.map (homOfLE h).op
+  map_add' _ _ := rfl
+  map_mul' _ _ := rfl
+  map_one' := rfl
+  map_zero' := rfl
+
+/-- **The differential structure presheaf on `Spec A`.**
+
+This is the gate for Item B: `restrict_deriv` — which `CharSetTac/DiffSheaf.lean` states as
+an *axiom* — is here a theorem, and its proof is `rfl`.
+
+That it is `rfl` is the whole design paying off. Restriction is precomposition with an
+inclusion of primes, and the derivation acts stalkwise, so both sides of the condition apply
+the same stalk derivation at the same prime. Nothing has to commute; it is the same
+computation written twice. -/
+noncomputable def specDiffPresheaf (d : Derivation R A A) :
+    DiffPresheaf R (PrimeSpectrum A) where
+  sections U := Sections A U
+  commRing U := inferInstance
+  algebra U := sectionsAlgebra R A U
+  deriv U := sheafDeriv d U
+  restrict h := sectionsRestrict h
+  restrict_deriv _ _ := rfl
+
+end Presheaf
 
 end Wu
