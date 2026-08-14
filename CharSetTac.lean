@@ -30,3 +30,4 @@ import CharSetTac.DerivationLocalizationExamples
 import CharSetTac.StructureSheafDeriv
 import CharSetTac.DiffSpec
 import CharSetTac.RadicalDiffIdeal
+import CharSetTac.DiffPolynomial
