@@ -151,9 +151,25 @@ The dual-number route worked as designed: no representative was ever named, and
 `TrivSqZeroExt.isUnit_of_isUnit_fst`, `Derivation.toDualHom`, `TrivSqZeroExt.dualMap` —
 are all general-purpose and sit in root namespaces for upstreaming.
 
-Steps 2–4 (prime differential ideals, structure sheaf, discharging `DiffPresheaf`) remain.
-The gate for those is unchanged: a concrete differential ring instantiates `DiffPresheaf`
-with `restrict_deriv` proved rather than assumed.
+**Item B is done.** All four steps, in the reordered sequence 1 → 3 → 4 → 2:
+
+| | |
+|---|---|
+| `Derivation.localization` | `d` extends to any localization, via dual numbers |
+| `stalkDeriv`, `stalkDeriv_mk` | ... hence to every stalk; a fraction goes to a fraction |
+| `sectionDeriv_mem` | `isLocallyFraction` survives |
+| `sheafDeriv`, `specDiffPresheaf` | **`restrict_deriv` proved, by `rfl`** |
+| `IsDiffIdeal`, `DiffPrimeSpectrum` | the differential spectrum as a subspace |
+
+The gate — a concrete construction instantiating `DiffPresheaf` with `restrict_deriv` proved
+rather than assumed — is met.
+
+**The estimate in this plan was wrong about where the cost was.** It called B "medium risk,
+one classical lemma". The lemma was the easy part; essentially all the effort went into
+Mathlib's instance and defeq layer: the `LocalizedModule`/`IsLocalization` spelling gap, a
+`Module ℤ` diamond that forced `DiffPresheaf` to be generalised over a base ring, `Algebra R`
+missing on sections, and a `whnf` blowup that only cleared once the pointwise ring lemmas
+were established *first*. The mathematical content of the whole item is about fifteen lines.
 
 ### Risk
 

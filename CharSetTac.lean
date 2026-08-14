@@ -28,3 +28,4 @@ import CharSetTac.DiffDemandTest
 import CharSetTac.DerivationLocalization
 import CharSetTac.DerivationLocalizationExamples
 import CharSetTac.StructureSheafDeriv
+import CharSetTac.DiffSpec
