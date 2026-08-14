@@ -88,16 +88,19 @@ different object, same encoding.
 **Call sites (6.0): K = 0 non-example consumers; 12 uses in
 [CharSetTac/DiffPolynomialExamples.lean](CharSetTac/DiffPolynomialExamples.lean).**
 
-Recorded honestly, because the distinction matters to a reviewer. The examples file exercises
+Recorded honestly, because the distinction matters to a reviewer. The examples exercise
 `DiffPolynomial`, `deriv`, `Y`, `evalDiff`, `evalDiff_deriv` and `evalDiff_unique` — including
-one case (`isDiffIdeal_expOde`) where `R{y}` and `IsDiffIdeal` meet, which is the
-Ritt–Raudenbush setting. But demonstrations are not consumers: the intended *consumer*
-(Ritt–Raudenbush itself) is not built yet, and no inline re-derivation of `R{y}` exists
-elsewhere in the project. A Mathlib reviewer is entitled to ask "what depends on this?", and
-today the honest answer is "the examples, and a theorem that isn't written yet".
+`isDiffIdeal_expOde`, where `R{y}` and `IsDiffIdeal` meet, and
+[CharSetTac/DiffPolynomialHeavy.lean](CharSetTac/DiffPolynomialHeavy.lean), where the whole
+stack lands on `PowerSeries` (`exp` kills the radical differential ideal `{y' - y}`).
 
-This is the one soft spot in candidate 1's case, and it is the reason to ship it together
-with candidate 4 rather than alone.
+But demonstrations are not consumers. Ritt–Raudenbush's *reduction* half is now proved
+(candidate 4) — and it is stated abstractly over any `Derivation R A A`, so it does not
+mention `R{y}` either. What would make `R{y}` load-bearing is the *second* half, that primes
+in `R{y}` have finite bases, and that is the characteristic-set argument, still unwritten.
+
+So this remains the soft spot in candidate 1's case, and it is why candidate 1 should ship
+alongside candidate 4 rather than alone.
 
 **Cost.** Def + derivations + commutation: **CHEAP** (done, compiles). The universal property:
 **MODERATE** and *not* mechanical — `evalDiff` currently sends `y^(k) ↦ d^[k] (f i)`, and in
@@ -220,6 +223,14 @@ differential ideal is differential" holds. (The strictly-more-general setting is
 ring**, where the property is imposed as an axiom rather than proved; every Ritt algebra is a
 Keigher ring. Generalising to Keigher rings would change the theorem into a definition, so it
 is not a weakening.)
+
+**Call sites: a real one.** [CharSetTac/RittRaudenbush.lean](CharSetTac/RittRaudenbush.lean)
+proves the reduction half of Ritt–Raudenbush — every radical differential ideal has a finite
+basis as soon as every prime one does — and it consumes `IsRadicalDiffIdeal`,
+`radicalDiffIdeal`, `radicalDiffIdeal.le_of_subset`, `radicalDiffIdeal.isRadical` and
+`radicalDiffIdeal_mul_le`. That is a named classical theorem depending on this API, not a
+demonstration. It also shows the ℚ hypothesis is *not* needed for the reduction, only for
+Ritt's lemma itself.
 
 **⚠️ Open question — the one thing I could not settle.** This project states everything over
 `Derivation R A A` rather than Mathlib's `Differential` class, because `Differential` fixes the
