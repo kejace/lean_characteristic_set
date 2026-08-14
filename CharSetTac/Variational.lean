@@ -230,6 +230,59 @@ theorem E_deriv (L : P) : E (Dtot L) = 0 := by
   rw [h1, hN, euler_deriv, pd_eq_zero_of_order_lt (L := L) (k := N) (by omega)]
   simp
 
+/-! ### Integration by parts
+
+The identity underneath everything in this subject:
+
+```
+  (D^k a)·b = (-1)^k a·(D^k b) + D(B_k(a,b))
+```
+
+"Moving `k` derivatives across a product costs `(-1)^k` plus a total derivative." Every
+statement about the Euler operator is a corollary of it applied with `a = y`, and it is what
+the classical `∫ u^(k) v = (-1)^k ∫ u v^(k)` becomes once the integral is discarded and only
+the boundary term is kept.
+
+`B_k` is defined by the recursion that the induction actually needs, rather than as
+`∑_{j<k} (-1)^j (D^{k-1-j} a)(D^j b)` — the closed form has a truncated subtraction in the
+exponent, and the recursion does not. -/
+
+/-- The boundary term of integrating by parts `k` times. -/
+noncomputable def boundary : ℕ → P → P → P
+  | 0, _, _ => 0
+  | (k + 1), a, b => (-1 : ℚ) ^ k • (a * (Dtot : P → P)^[k] b) + boundary k (Dtot a) b
+
+/-- **Integration by parts, `k` times.** No hypothesis on the characteristic, and none on the
+base: this holds over any commutative ring. -/
+theorem ibp (k : ℕ) (a b : P) :
+    (Dtot : P → P)^[k] a * b
+      = (-1 : ℚ) ^ k • (a * (Dtot : P → P)^[k] b) + Dtot (boundary k a b) := by
+  induction k generalizing a with
+  | zero => simp [boundary]
+  | succ k ih =>
+      have hb : boundary (k + 1) a b
+          = (-1 : ℚ) ^ k • (a * (Dtot : P → P)^[k] b) + boundary k (Dtot a) b := rfl
+      have hleib : Dtot (a * (Dtot : P → P)^[k] b)
+          = a * (Dtot : P → P)^[k + 1] b + (Dtot : P → P)^[k] b * Dtot a := by
+        rw [Derivation.leibniz, Function.iterate_succ_apply' (f := (Dtot : P → P))]
+        simp [smul_eq_mul]
+      rw [Function.iterate_succ_apply, ih (Dtot a), hb, map_add, Derivation.map_smul, hleib,
+        pow_succ, mul_comm (Dtot a) ((Dtot : P → P)^[k] b)]
+      module
+
+/-- The Euler operator is `y` integrated by parts out of `∑_k y^(k) ∂_k`. Stated at a single
+`k`, which is the reusable form. -/
+theorem yy_pd_eq (k : ℕ) (L : P) :
+    y[k] * pd k L
+      = (-1 : ℚ) ^ k • (y[0] * (Dtot : P → P)^[k] (pd k L))
+        + Dtot (boundary k y[0] (pd k L)) := by
+  have hy : (Dtot : P → P)^[k] y[0] = y[k] := by
+    induction k with
+    | zero => rfl
+    | succ k ih => rw [Function.iterate_succ_apply' (f := (Dtot : P → P)), ih,
+        Wu.DiffPolynomial.deriv_Y]
+  rw [← hy, ibp]
+
 /-! ### `E` as a linear map, and functionals
 
 `E` is defined by a truncation that depends on its argument, so linearity is not free: it
@@ -325,5 +378,104 @@ example : E (2 * (y[0] * y[1])) = 0 := by
   rw [← deriv_y_sq, E_deriv]
 
 end Examples
+
+/-! ### Where the complex is *not* exact, and why
+
+`E ∘ D = 0` says `im D ⊆ ker E`. The converse — every variationally trivial Lagrangian is a
+total derivative — is the substantial half, and over a base of **constants** it is *false as
+usually stated*. The correct statement (Barakat–De Sole–Kac, Prop. 1.5) is
+
+```
+  ker E = R ⊕ D(R{y})
+```
+
+with the `R` summand genuinely there: a constant is variationally trivial, but it is not a
+total derivative, because every `D f` has zero constant term. Geometrically one has
+`1 = D_x(x)` and the summand disappears — but `ℚ{y}` has no `x`, which is exactly the gap
+`CharSetTac/JetContact.lean` fills.
+
+This matters practically: Olver–Shakiban's *A resolution of the Euler operator I* (Proc. AMS
+69 (1978) 223–229) prints the complex `0 → R → R{u} → R{u} → …` as exact, and at the
+`E`-slot in degree `0` that over-claims by exactly this one summand. The two theorems below
+are that correction, formalized. -/
+
+section NotExact
+
+/-- **A total derivative has zero constant term.** Each term of `D f` carries a factor
+`y^(k+1)`. -/
+theorem constantCoeff_deriv (f : P) : MvPolynomial.constantCoeff (Dtot f) = 0 := by
+  induction f using MvPolynomial.induction_on with
+  | C r => simp
+  | add p q hp hq => simp [hp, hq]
+  | mul_X p n hp =>
+      rw [Derivation.leibniz, Wu.DiffPolynomial.deriv_X]
+      simp [smul_eq_mul]
+
+/-- **Constants are variationally trivial.** Every `∂/∂y^(k)` kills them, so every term of the
+alternating sum vanishes — at any truncation. -/
+theorem euler_C (N : ℕ) (c : ℚ) : euler N (C c) = 0 := by
+  simp [euler, pd]
+
+theorem E_C (c : ℚ) : E (C c) = 0 := euler_C _ c
+
+/-- **…but a nonzero constant is not a total derivative.** So `ker E ⊋ im D`, and the
+variational complex is *not* exact at the Lagrangian slot over a base of constants. -/
+theorem C_notMem_range_deriv {c : ℚ} (hc : c ≠ 0) :
+    (C c : P) ∉ LinearMap.range (Dtot.toLinearMap : P →ₗ[ℚ] P) := by
+  rintro ⟨f, hf⟩
+  have hf' : Dtot f = C c := hf
+  have h := congrArg MvPolynomial.constantCoeff hf'
+  rw [constantCoeff_deriv] at h
+  simp only [MvPolynomial.constantCoeff_C] at h
+  exact hc h.symm
+
+/-- The gap, stated outright: the kernel of the Euler operator strictly contains the image of
+the total derivative. -/
+theorem range_deriv_lt_ker_E :
+    ∃ L : P, E L = 0 ∧ L ∉ LinearMap.range (Dtot.toLinearMap : P →ₗ[ℚ] P) :=
+  ⟨C 1, E_C 1, C_notMem_range_deriv one_ne_zero⟩
+
+end NotExact
+
+/-! ### Where it stops: characteristic `p`
+
+Ritt's lemma needs a `ℚ`-algebra, and so does the converse to `E ∘ D = 0` — the homotopy
+divides by the polynomial degree. That is not an artefact of the proofs. In characteristic
+`p` the total derivative acquires a large kernel: every `p`-th power is a nonconstant element
+that `D` annihilates, so `ker D` is much bigger than `R` and the whole exactness story fails
+at the first step. -/
+
+section CharP
+
+instance : Fact (Nat.Prime 2) := ⟨Nat.prime_two⟩
+instance : Fact (1 < 2) := ⟨one_lt_two⟩
+
+/-- `ℚ{y}`'s counterpart over `𝔽₂`. -/
+abbrev P₂ : Type := Wu.DiffPolynomial (ZMod 2) Unit
+
+private theorem two_eq_zero : (2 : P₂) = 0 := by
+  have h : (MvPolynomial.C (2 : ZMod 2) : P₂) = 0 := by
+    rw [show (2 : ZMod 2) = 0 from by decide, map_zero]
+  rwa [map_ofNat] at h
+
+/-- **In characteristic 2, `D(y²) = 0`.** Over `ℚ` the same computation gives `2yy'`, which is
+`deriv_y_sq` above and is nonzero. -/
+theorem deriv_sq_eq_zero :
+    Wu.DiffPolynomial.deriv (ZMod 2) Unit (Wu.DiffPolynomial.Y (() : Unit) 0 ^ 2) = 0 := by
+  rw [Derivation.leibniz_pow]
+  simp only [Wu.DiffPolynomial.deriv_Y, smul_eq_mul, nsmul_eq_mul, Nat.cast_ofNat,
+    two_eq_zero, zero_mul]
+
+/-- …and `y²` is not zero, nor a constant. So in characteristic `p` the kernel of `D` is much
+larger than the constants, and the exactness story collapses at the first step. This is the
+same obstruction that makes Ritt's lemma a `ℚ`-algebra theorem. -/
+theorem sq_ne_zero : (Wu.DiffPolynomial.Y (() : Unit) 0 ^ 2 : P₂) ≠ 0 := by
+  intro h
+  have hc := congrArg (MvPolynomial.coeff (Finsupp.single (((), 0) : Unit × ℕ) 2)) h
+  rw [Wu.DiffPolynomial.Y, MvPolynomial.X_pow_eq_monomial, MvPolynomial.coeff_monomial,
+    MvPolynomial.coeff_zero, if_pos rfl] at hc
+  exact absurd hc (by decide)
+
+end CharP
 
 end Wu.Variational
