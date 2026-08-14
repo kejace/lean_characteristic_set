@@ -1,4 +1,5 @@
 import CharSetTac.Poly
+import CharSetTac.DerivationOfNat
 import CharSetTac.Pseudo
 import CharSetTac.CharSet
 import CharSetTac.Attr
@@ -33,5 +34,6 @@ import CharSetTac.RadicalDiffIdeal
 import CharSetTac.DiffPolynomial
 import CharSetTac.DiffPolynomialExamples
 import CharSetTac.DiffPolynomialHeavy
+import CharSetTac.Variational
 import CharSetTac.RittRaudenbush
 import CharSetTac.MathlibableEvidence

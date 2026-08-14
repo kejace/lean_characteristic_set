@@ -72,5 +72,5 @@ example (d : Derivation ℤ R R) : d (1 : R) = 0 := by simp
 
 example (d : Derivation ℤ R R) (x y : R) :
     d (2 * (x * y)) = 2 * (x * d y + y * d x) := by
-  simp only [Derivation.leibniz, Wu.Derivation.map_ofNat, smul_eq_mul]
+  simp only [Derivation.leibniz, Derivation.map_ofNat, smul_eq_mul]
   ring

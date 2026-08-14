@@ -2,6 +2,7 @@
 Copyright (c) 2026 Wu tactic contributors. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 -/
+import CharSetTac.DerivationOfNat
 import CharSetTac.Frontend
 import Mathlib.RingTheory.Derivation.DifferentialRing
 
@@ -39,21 +40,9 @@ open scoped Differential
 
 namespace Wu
 
-/-- **A numeral literal is annihilated by any derivation.**
-
-Mathlib has `Derivation.map_natCast`, but it is stated for `Nat.cast n`, and a literal like
-`2` elaborates to `OfNat.ofNat 2`. So it never fires on real goals — and without it,
-`Derivation.leibniz` applied to `2 * (x * y)` expands to `2 • D (x*y) + (x*y) • D 2` and
-leaves that `D 2` alive. The engine then reflects it as a *spurious atom* multiplied by
-`x*y`, which silently poisons the characteristic set: the equation for `D v` is no longer
-linear in the derivative, and the goal stops reducing.
-
-That failure mode is invisible from the outside — the tactic just reports that the goal does
-not follow — which is why this is worth a named lemma rather than a simp-set tweak. -/
-@[simp] theorem Derivation.map_ofNat {R A M : Type*} [CommSemiring R] [CommSemiring A]
-    [Algebra R A] [AddCommMonoid M] [Module A M] [Module R M] (D : Derivation R A M)
-    (n : ℕ) [n.AtLeastTwo] : D (no_index (OfNat.ofNat n) : A) = 0 := by
-  rw [← Nat.cast_ofNat]; exact D.map_natCast _
+/-! `Derivation.map_ofNat` — the lemma that keeps `D 2` from surviving as a spurious atom —
+now lives in `CharSetTac/DerivationOfNat.lean`, in the root `Derivation` namespace where it
+belongs and where it can be upstreamed. It is still referenced by name below. -/
 
 /-- The simp set that expands `δ` over ring operations. This is what removes the need for
 the engine to know anything about derivations. -/
