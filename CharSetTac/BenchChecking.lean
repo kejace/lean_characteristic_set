@@ -39,14 +39,39 @@ cost of handing over the expanded one, for the identical goal.
 input — three syntactic nodes — the cost grows with the expanded size, because `ring1` must
 expand to verify. Roughly linear, drifting superlinear.
 
-## What this means
+**Finding 3: the win survives deep nesting.** The two measurements above use a shallow
+`(a+b+c)^n`; a real cofactor is nested one level per reduction step, which is a different
+shape. Tested on `(a+b)((c+d)((e+f)((g+k)(a+c) + (b+d)) + (e+g)) + (f+k)) + (a+d)` — four
+levels deep, 62 terms expanded — against the same goal:
 
-Both halves matter and they point in different directions.
+```
+nested tree      1823 heartbeats
+expanded         4442
+```
 
-A structured encoding plausibly buys a **constant factor**, and that factor is real: our own
-engine currently expands its cofactors before emitting them, which puts us on the wrong side
-of the 2×. Emitting them factored is a cheap improvement and does not need any category
-theory.
+2.4×, so nesting does not hurt.
+
+## What this means — and a recommendation I withdrew
+
+A structured encoding buys a **constant factor**, and that factor is real and measured.
+
+I initially concluded from that we were leaving 2× on the table, because the engine expands
+its cofactors before emitting them. **That was wrong, and the reason is worth recording.**
+
+`Certificate.cancelCommonFactors` divides initials out of the cofactors, and it needs them
+*expanded* to do the exact division. It is also the bigger lever: 4258 → 672 terms on
+Desargues, 22308 → 1860 on Simson — 6.3× and 12×, against the tree's 2.4×. The two are not
+composable without polynomial factorisation, since cancellation destroys the tree structure
+it operates on.
+
+So the tree would only pay where cancellation finds nothing. On both hard cases we have,
+cancellation fires and shrinks more. There is no known case where the tree is the better
+lever, so it is not implemented.
+
+**What would change that decision:** a certificate that is large *and* where
+`cancelCommonFactors` finds nothing to remove. If one turns up, the tree is worth about
+2.4× on it, and the place to add it is `Reduction.step`, keeping an expression tree
+alongside the expanded form and choosing at emission time.
 
 It does **not** buy the collapse. The normal form is irreducible content: whatever the proof
 term looks like, something has to establish that two polynomials are equal, and that costs
@@ -85,5 +110,12 @@ example (a b c x y : ℝ) (h : x = y) :
 example (a b c x y : ℝ) (h : x = y) :
     (a + b + c) ^ 9 * x = (a + b + c) ^ 9 * y := by
   linear_combination (a + b + c) ^ 9 * h
+
+/-- A four-level nested cofactor — the shape a reduction chain produces — checks at 1823
+heartbeats against 4442 for its 62-term expansion. The win survives nesting. -/
+example (a b c d e f g k x y : ℝ) (h : x = y) :
+    ((a+b)*((c+d)*((e+f)*((g+k)*(a+c) + (b+d)) + (e+g)) + (f+k)) + (a+d)) * x
+      = ((a+b)*((c+d)*((e+f)*((g+k)*(a+c) + (b+d)) + (e+g)) + (f+k)) + (a+d)) * y := by
+  linear_combination ((a+b)*((c+d)*((e+f)*((g+k)*(a+c) + (b+d)) + (e+g)) + (f+k)) + (a+d)) * h
 
 end Wu.BenchChecking
