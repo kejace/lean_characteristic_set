@@ -80,6 +80,29 @@ def prolongOnce : TacticM Unit := withMainContext do
         Nat.cast_ofNat, Nat.add_one_sub_one] at $newId:ident)
     try evalTactic simpTac catch _ => pure ()
 
+/-- **Expand `δ` over ring operations in the goal.**
+
+Prolongation handles the hypotheses; this handles the conclusion, and without it a goal of
+the shape `δ(H) = 0` is hopeless: the engine reflects `δ(H)` as a single opaque atom, so
+there is nothing for the hypotheses to act on and `wu` reports that the goal does not follow.
+
+That shape is not exotic — it is what **every conservation law looks like**. `H` is a first
+integral of a system exactly when `δ H = 0` on solutions, and `H` is always a compound
+expression. Until this step existed, `wu_diff` could prove `y″ = 2y³` from `y′ = y²` but not
+that `(y′)² + y²` is conserved for the harmonic oscillator, which is the more useful of the
+two.
+
+Wrapped in `try`, and the caller checks for goals afterwards, because on an easy instance
+the expansion alone can finish the proof. -/
+def expandGoal : TacticM Unit := withMainContext do
+  let simpTac ← `(tactic|
+    simp only [map_add, map_sub, map_neg, map_zero,
+      Derivation.map_one_eq_zero,
+      Derivation.leibniz, Derivation.leibniz_pow, smul_eq_mul, nsmul_eq_mul,
+      zsmul_eq_mul, Derivation.map_ofNat, Derivation.map_natCast,
+      Nat.cast_ofNat, Nat.add_one_sub_one])
+  try evalTactic simpTac catch _ => pure ()
+
 /-! ### Several derivations
 
 `wu_diff` uses `Differential.deriv`, of which a ring has exactly one. A PDE system has
@@ -136,6 +159,8 @@ elab_rules : tactic
     let k := match n with | some m => m.getNat | none => 1
     for _ in [0:k] do
       prolongOnce
+    expandGoal
+    unless (← getGoals).isEmpty do
     withMainContext do
       let mut cfg : Config := {}
       if let some vsyn := vs then
@@ -166,6 +191,8 @@ elab_rules : tactic
     for round in [0:k] do
       for (d, i) in ds.getElems.zipIdx do
         prolongOnceBy d (Name.mkSimple s!"wuD{i}r{round}") only
+    expandGoal
+    unless (← getGoals).isEmpty do
     withMainContext do
       let mut cfg : Config := {}
       if let some vsyn := vs then
