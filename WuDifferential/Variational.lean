@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 -/
 import CharSetTac.DerivationOfNat
 import CharSetTac.DiffPolynomial
+import CharSetTac.EulerIdentity
 import Mathlib.Algebra.MvPolynomial.PDeriv
 import Mathlib.RingTheory.Derivation.Lie
 
@@ -378,6 +379,112 @@ example : E (2 * (y[0] * y[1])) = 0 := by
   rw [← deriv_y_sq, E_deriv]
 
 end Examples
+
+/-! ### The converse, for homogeneous Lagrangians
+
+`E ∘ D = 0` gives `im D ⊆ ker E`. The other inclusion is the substantial half, and this is
+it for a homogeneous `L` of positive degree.
+
+The mechanism is the **graded homotopy**. Euler's identity says the total-degree operator
+`Δ = ∑_k y^(k) ∂/∂y^(k)` acts on a degree-`n` polynomial as multiplication by `n`. Feeding
+each term of `Δ L` through integration by parts moves every derivative onto `y` itself,
+leaving `y · E(L)` plus a total derivative. So
+
+```
+  n · L  =  y · E(L)  +  D(I(L))
+```
+
+and if `E(L) = 0` then `L = D(I(L)/n)` — the division by `n` being exactly why the theorem
+is false in characteristic `p`. -/
+
+section Converse
+
+/-- The accumulated boundary term of integrating `∑_{k<N} y^(k) ∂_k L` by parts. -/
+noncomputable def ibpSum (N : ℕ) (L : P) : P :=
+  ∑ k ∈ Finset.range N, boundary k y[0] (pd k L)
+
+/-- **Integration by parts, summed.** `∑_{k<N} y^(k) ∂_k L = y · euler N L + D(I_N L)`.
+
+Each summand is `yy_pd_eq`; the sum just collects them. -/
+theorem sum_yy_pd (N : ℕ) (L : P) :
+    ∑ k ∈ Finset.range N, y[k] * pd k L = y[0] * euler N L + Dtot (ibpSum N L) := by
+  rw [euler, ibpSum, Finset.mul_sum, map_sum, ← Finset.sum_add_distrib]
+  refine Finset.sum_congr rfl fun k _ => ?_
+  rw [yy_pd_eq, mul_smul_comm]
+
+/-- Every variable of `L` has order at most `order L`. -/
+theorem snd_le_order {L : P} {p : Unit × ℕ} (hp : p ∈ L.vars) : p.2 ≤ order L :=
+  Finset.le_sup (f := id) (Finset.mem_image_of_mem Prod.snd hp)
+
+/-- **Euler's identity in `ℚ{y}`.** The `Fintype`-free form from
+`CharSetTac/EulerIdentity.lean` applied at the index type `Unit × ℕ`, with the sum running
+over orders `< N`. -/
+theorem sum_yy_pd_eq_nsmul {L : P} {n N : ℕ} (h : L.IsHomogeneous n) (hN : order L < N) :
+    ∑ k ∈ Finset.range N, y[k] * pd k L = n • L := by
+  classical
+  have hinj : Set.InjOn (fun k : ℕ => ((), k)) (Finset.range N) := by
+    intro a _ b _ hab
+    exact congrArg Prod.snd hab
+  have himg : ∑ i ∈ (Finset.range N).image (fun k : ℕ => ((), k)),
+      MvPolynomial.X i * MvPolynomial.pderiv i L
+      = ∑ k ∈ Finset.range N, y[k] * pd k L := by
+    rw [Finset.sum_image (fun a ha b hb => hinj ha hb)]
+    rfl
+  rw [← himg]
+  refine MvPolynomial.IsHomogeneous.sum_X_mul_pderiv_of_vars_subset ?_ h
+  intro p hp
+  refine Finset.mem_image.mpr ⟨p.2, Finset.mem_range.mpr ?_, ?_⟩
+  · exact lt_of_le_of_lt (snd_le_order hp) hN
+  · exact Prod.ext rfl rfl
+
+/-- **The graded homotopy.** `n · L = y · E(L) + D(I(L))` for `L` homogeneous of degree `n`.
+
+This is the identity the whole converse rests on. Note it is unconditional — no hypothesis
+on `E(L)` — and holds in any characteristic. -/
+theorem nsmul_eq_yy_mul_euler_add {L : P} {n N : ℕ} (h : L.IsHomogeneous n)
+    (hN : order L < N) :
+    (n : ℚ) • L = y[0] * euler N L + Dtot (ibpSum N L) := by
+  rw [← sum_yy_pd N L, sum_yy_pd_eq_nsmul h hN, ← Nat.cast_smul_eq_nsmul ℚ]
+
+/-- **A variationally trivial homogeneous Lagrangian of positive degree is a total
+derivative.**
+
+The converse to `E ∘ D = 0`, in the homogeneous case. Dividing by `n` is where
+characteristic zero is used, and `Wu.Variational.deriv_sq_eq_zero` is the counterexample
+showing it cannot be avoided. -/
+theorem exists_deriv_eq_of_euler_eq_zero {L : P} {n : ℕ} (hn : n ≠ 0)
+    (h : L.IsHomogeneous n) (hE : E L = 0) :
+    ∃ f : P, Dtot f = L := by
+  set N := order L + 1 with hNdef
+  have hN : order L < N := by omega
+  have hEN : euler N L = 0 := by rw [← E_eq_euler hN]; exact hE
+  have key := nsmul_eq_yy_mul_euler_add h hN
+  rw [hEN, mul_zero, zero_add] at key
+  refine ⟨((n : ℚ)⁻¹) • ibpSum N L, ?_⟩
+  rw [Derivation.map_smul, ← key, smul_smul, inv_mul_cancel₀ (by exact_mod_cast hn), one_smul]
+
+/-- **The characterisation, for homogeneous Lagrangians of positive degree.**
+
+`L` is variationally trivial if and only if it is a total derivative — both halves of
+exactness at the Lagrangian slot of the variational complex, in the graded case. The forward
+direction is the converse proved above; the reverse is `E ∘ D = 0`. -/
+theorem euler_eq_zero_iff_mem_range {L : P} {n : ℕ} (hn : n ≠ 0) (h : L.IsHomogeneous n) :
+    E L = 0 ↔ ∃ f : P, Dtot f = L :=
+  ⟨fun hE => exists_deriv_eq_of_euler_eq_zero hn h hE, fun ⟨f, hf⟩ => hf ▸ E_deriv f⟩
+
+/-- The null Lagrangian `2y·y'` is homogeneous of degree `2`, so the characterisation applies
+and *produces* a potential rather than requiring one to be guessed. -/
+example : ∃ f : P, Dtot f = 2 * (y[0] * y[1]) := by
+  refine (euler_eq_zero_iff_mem_range (n := 2) (by norm_num) ?_).mp ?_
+  · have h1 : (y[0] : P).IsHomogeneous 1 := by
+      rw [Wu.DiffPolynomial.Y]; exact MvPolynomial.isHomogeneous_X _ _
+    have h2 : (y[1] : P).IsHomogeneous 1 := by
+      rw [Wu.DiffPolynomial.Y]; exact MvPolynomial.isHomogeneous_X _ _
+    rw [show (2 : P) = MvPolynomial.C (2 : ℚ) from (map_ofNat _ 2).symm]
+    simpa using ((MvPolynomial.isHomogeneous_C _ (2 : ℚ)).mul (h1.mul h2))
+  · rw [← deriv_y_sq, E_deriv]
+
+end Converse
 
 /-! ### Where the complex is *not* exact, and why
 

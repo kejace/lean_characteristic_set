@@ -1,6 +1,7 @@
 import CharSetTac.Poly
 import CharSetTac.DerivationOfNat
 import CharSetTac.MapCoeffs
+import CharSetTac.EulerIdentity
 import CharSetTac.Pseudo
 import CharSetTac.CharSet
 import CharSetTac.Attr
