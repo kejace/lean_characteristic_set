@@ -89,7 +89,8 @@ constants and exactness fails at step one. This is the same reason Ritt's lemma 
 
 All three research strands independently rank the same theorem first.
 
-**(a) `ker E = R ⊕ D(R{y})` — the converse to `E ∘ D = 0`.** Olver Thm 4.7 (1st ed. p. 252);
+**(a) `ker E = R ⊕ D(R{y})` — the converse to `E ∘ D = 0`. ✅ proved for homogeneous `L`;
+the passage to general `L` remains.** Olver Thm 4.7 (1st ed. p. 252);
 Barnich–Brandt–Henneaux Thm 4.1(i); Barakat–De Sole–Kac Prop. 1.5.
 
 Note the `R` summand — it is *not* `ker E = im D`. We have already formalized why
@@ -106,9 +107,21 @@ Route: the graded homotopy. With `Δ = ∑ y^(k) ∂/∂y^(k)` the *total-degree
 so a homogeneous `L` of degree `n ≥ 1` with `E(L) = 0` is `D(I(L)/n)`. Our `ibp` is exactly
 the lemma this needs.
 
-**Blocker, verified**: Mathlib's Euler identity `IsHomogeneous.sum_X_mul_pderiv` requires
-`[Fintype σ]`, and ours is `Unit × ℕ`. A version summing over a finite superset of `vars` has
-to be proved. That is the real work, and it is *also* a clean Mathlib contribution.
+**Blocker, cleared.** Mathlib's Euler identity `IsHomogeneous.sum_X_mul_pderiv` requires
+`[Fintype σ]`, and ours is `Unit × ℕ`. `CharSetTac/EulerIdentity.lean` restates it over any
+`Finset` containing `vars` (`sum_X_mul_pderiv_of_vars_subset`); Mathlib's version is the case
+`s = univ`, and this is itself a clean Mathlib contribution.
+
+`WuDifferential/Variational.lean` then has the graded homotopy
+`n·L = y·E(L) + D(I(L))` (`nsmul_eq_yy_mul_euler_add` — unconditional, and
+characteristic-free), hence `euler_eq_zero_iff_mem_range`: **for homogeneous `L` of positive
+degree, variationally trivial ⟺ total derivative.** Dividing by `n` is the only use of
+characteristic zero, and `deriv_sq_eq_zero` is the counterexample showing it is unavoidable.
+
+**What remains** is the passage to general `L`: `E` respects the total-degree grading (`pd k`
+lowers degree by one, `D` preserves it), so `E L = 0` should force each homogeneous component
+to be variationally trivial — with the degree-`0` component being exactly the `R` summand
+that `range_deriv_lt_ker_E` isolates.
 
 **(b) `ker D = R`.** Short: if `p` has top order `N`, `Dp` contains `(∂p/∂y^(N)) y^(N+1)`,
 which cannot cancel. Gives `H⁰` of the horizontal complex.
@@ -199,10 +212,11 @@ strictly increases. The literature's discipline is to reduce every question to
 where `MvPolynomial.isNoetherianRing` applies. Rosenfeld's lemma is precisely the theorem that
 licenses the reduction.
 
-**The single highest-leverage edit in this repo** is §2.2: generalise `DiffPolynomial.deriv`
-from an `R`-linear derivation to one extending a given derivation on `R`. It unblocks the
-variational converse, conservation laws with `x`-dependent densities, and Picard–Vessiot, all
-at once.
+**§2.2 — done.** `Wu.DiffPolynomial.derivOver` extends a given derivation on `R`, built on
+the new `MvPolynomial.mapCoeffsDeriv` (which Mathlib has only for univariate `Polynomial`).
+`derivOver_C : D (C r) = C (d r)` and `derivOver_Y : D y^(k) = y^(k+1)`, with
+`derivOver_eq_deriv_of_const` confirming it generalises rather than replaces the old one.
+This is what unblocks `x`-dependent conservation laws and Picard–Vessiot Prop. 1.20.
 
 ---
 
