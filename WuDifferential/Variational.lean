@@ -412,6 +412,15 @@ theorem sum_yy_pd (N : ℕ) (L : P) :
   refine Finset.sum_congr rfl fun k _ => ?_
   rw [yy_pd_eq, mul_smul_comm]
 
+/-- A bound on the orders occurring in `L` bounds `order L`. This is what makes `order`
+usable on a concrete polynomial, where `vars` is computed from the syntax. -/
+theorem order_lt_of_vars_lt {L : P} {N : ℕ} (hN : 0 < N) (h : ∀ p ∈ L.vars, p.2 < N) :
+    order L < N := by
+  rw [order]
+  refine (Finset.sup_lt_iff hN).mpr fun b hb => ?_
+  obtain ⟨p, hp, rfl⟩ := Finset.mem_image.mp hb
+  exact h p hp
+
 /-- Every variable of `L` has order at most `order L`. -/
 theorem snd_le_order {L : P} {p : Unit × ℕ} (hp : p ∈ L.vars) : p.2 ≤ order L :=
   Finset.le_sup (f := id) (Finset.mem_image_of_mem Prod.snd hp)

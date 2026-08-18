@@ -19,3 +19,4 @@ import WuDifferential.Variational
 import WuDifferential.JetContact
 import WuDifferential.Conservation
 import WuDifferential.VariationalWu
+import WuDifferential.VariationalExamples
