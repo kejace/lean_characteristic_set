@@ -17,8 +17,9 @@ all of it. The question is which algebra we have.
 
 ## 1. What is built and building
 
-Verified: full `lake build` clean, 8788 jobs, no `sorry` in any file below, axioms
-`propext / Classical.choice / Quot.sound` throughout.
+Verified: full `lake build` clean, 8793 jobs, no `sorry` in any file below, axioms
+`propext / Classical.choice / Quot.sound` throughout. (The variational, jet and conservation
+files live in `WuDifferential/`; `CharSetTac/` keeps the algebra and the tactic.)
 
 | Area | Files | Status |
 |---|---|---|
@@ -29,6 +30,12 @@ Verified: full `lake build` clean, 8788 jobs, no `sorry` in any file below, axio
 | Jet ring **with** independent variable; contact submodule; `df ≡ (Df) dx (mod contact)` | `JetContact.lean` | ✅ |
 | `Derivation.localization`, differential `Spec`, structure-sheaf derivation | `DerivationLocalization.lean`, `StructureSheafDeriv.lean` | ✅ |
 | `wu` / `wu_pde` tactics; Gauss–Codazzi–Ricci from `fderiv` | `Frontend.lean`, `WuDifferential/` | ✅ |
+| `R{y}` over a **differential** base; coefficientwise derivation | `DiffPolynomial.lean`, `MapCoeffs.lean` | ✅ |
+| Euler identity without `[Fintype σ]` | `EulerIdentity.lean` | ✅ |
+| Graded homotopy; converse to `E ∘ D = 0` for homogeneous `L` | `Variational.lean` | ✅ |
+| Evolutionary fields; KdV/Burgers conservation laws | `Conservation.lean` | ✅ |
+| Bicomplex `d = d_H + d_V`; prolongation of a function | `JetContact.lean` | ✅ |
+| Where `wu_diff` helps in the bicomplex, and where it does not | `VariationalWu.lean` | ✅ |
 
 Two of these turn out to be positioned exactly where the literature says the algebraic core
 lives. `[∂/∂u_i^(n), ∂] = ∂/∂u_i^(n−1)` is Barakat–De Sole–Kac eq. (1.2), which they take as

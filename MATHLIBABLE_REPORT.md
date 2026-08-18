@@ -1,7 +1,11 @@
 # `/mathlibable` — upstreaming assessment
 
-Six candidates, assessed 2026-08-14 against Mathlib `db584cd6d4` (2026-08-10, toolchain
-v4.33.0). Build clean at 8782 jobs; every declaration below elaborates.
+Eight candidates, assessed 2026-08-14 against Mathlib `db584cd6d4` (2026-08-10, toolchain
+v4.33.0). Build clean at 8793 jobs; every declaration below elaborates.
+
+Candidates 7 and 8 were added later: they came out of the base-ring generalisation and the
+variational converse, and each fills a gap that was *verified* by building against Mathlib
+rather than inferred from a search.
 
 Two proposed restatements are **verified compiling** in
 [CharSetTac/MathlibableEvidence.lean](CharSetTac/MathlibableEvidence.lean), which the root
@@ -16,6 +20,8 @@ executed (candidate 5, deleted).
 | 4 | `Wu.IsDiffIdeal` + `IsDiffIdeal.radical` (Ritt's lemma) | **YES — add as is**, with one open question |
 | 5 | `TrivSqZeroExt.isUnit_of_isUnit_fst` | **NO — Mathlib has it** ✅ *deleted* |
 | 6 | `Derivation.toDualHom`, `TrivSqZeroExt.dualMap` | **BORDERLINE — needs a human** |
+| 7 | `MvPolynomial.mapCoeffsDeriv` | **YES — add as is** (Mathlib has only the univariate case) |
+| 8 | `MvPolynomial.IsHomogeneous.sum_X_mul_pderiv_of_vars_subset` | **YES — add as is** (drops a `[Fintype σ]`) |
 
 ---
 
@@ -295,6 +301,70 @@ through an equiv risks making it *less* readable for no mathematical gain.
 
 ---
 
+## 7. `MvPolynomial.mapCoeffsDeriv` — YES, add as is
+
+`CharSetTac/MapCoeffs.lean`. Kind: `def` (+ `mapCoeffsₗ`, `mapCoeffsFun`, four simp lemmas).
+
+**The gap, named and verified.** Mathlib has exactly this for univariate polynomials —
+`Derivation.mapCoeffs` in `Mathlib/RingTheory/Derivation/MapCoeffs.lean`, by Daniel Weber —
+and nothing for `MvPolynomial`. Checked by reading the file: it is `Polynomial`-only, and its
+construction routes through `PolynomialModule` (`PolynomialModule.map`,
+`equivPolynomial.symm`), which has no multivariate counterpart.
+
+So Mathlib currently has `MvPolynomial.mkDerivation` — the derivations *linear over the
+coefficient ring*, which annihilate it — and no way to build the complementary ones. The two
+together are what a derivation on a polynomial ring generally is.
+
+**Why the construction is not a transliteration.** `MvPolynomial` does not unfold to `Finsupp`
+at elaboration transparency (verified: `Finsupp.mapRange.linearMap` fails to unify even with
+the index type supplied), so the obvious route is unavailable. It is built instead as a sum
+over the support, with `mapCoeffsFun_eq_sum` — *the sum may be taken over any finite superset
+of the support* — as the lemma the rest follows from. That lemma is arguably the reusable part.
+
+**Consumers:** `Wu.DiffPolynomial.derivOver`, hence `ℚ[x]{y}` and every `x`-dependent example
+in `WuDifferential/VariationalExamples.lean`.
+
+**Proposed location** `Mathlib/RingTheory/Derivation/MapCoeffs.lean` (alongside the univariate
+version) or a new `MvPolynomial` section there. PR title
+`feat(RingTheory/Derivation): coefficientwise derivation on MvPolynomial`.
+
+---
+
+## 8. `MvPolynomial.IsHomogeneous.sum_X_mul_pderiv_of_vars_subset` — YES, add as is
+
+`CharSetTac/EulerIdentity.lean`.
+
+**The gap, named and verified.** Mathlib's Euler identity is
+
+```lean
+theorem IsHomogeneous.sum_X_mul_pderiv (h : φ.IsHomogeneous n) :
+    ∑ i : σ, X i * pderiv i φ = n • φ
+```
+
+and `variable [Fintype σ]` is declared at `Mathlib/RingTheory/MvPolynomial/EulerIdentity.lean:55`,
+immediately above it. `∑ i : σ` is `∑ i ∈ Finset.univ`, so the hypothesis is not incidental —
+the statement cannot even be *written* without it.
+
+That rules it out for any polynomial ring on an infinite index type, `R{y}` included. But the
+mathematics does not need finiteness of `σ`: for a given `φ` only finitely many `pderiv i φ`
+are nonzero, exactly the `i ∈ φ.vars`. The finiteness comes from the element, not the index.
+
+The restatement sums over any `Finset` containing `vars`; **Mathlib's version is the special
+case `s = univ`**, so this strictly generalises it and the existing lemma could be derived
+from it in one line.
+
+**Generality: maximally general.** No hypothesis to weaken — `[CommRing R]` could plausibly be
+`[CommSemiring R]`, worth checking under `/generalise` before the PR.
+
+**Consumers:** the graded homotopy `nsmul_eq_yy_mul_euler_add`, hence the converse to
+`E ∘ D = 0`.
+
+**Proposed location** `Mathlib/RingTheory/MvPolynomial/EulerIdentity.lean`, before the
+`Fintype` section, with the existing result re-derived as a corollary. PR title
+`feat(RingTheory/MvPolynomial): Euler's identity without Fintype`.
+
+---
+
 ## Recommended order
 
 1. **Candidate 3** (`map_ofNat`) — trivial, self-contained, establishes contact.
@@ -302,3 +372,6 @@ through an equiv risks making it *less* readable for no mathematical gain.
 3. **Candidate 2** (`Derivation.localization`) — the strongest: real gap, 3 consumers,
    classical statement.
 4. **Candidates 1 + 4** together, after the Δ-generalisation — the differential-algebra layer.
+5. **Candidates 7 + 8** — independent of the Zulip question, since neither mentions
+   `Derivation` vs `Differential`, so they can go at any point. Candidate 8 is the smallest
+   PR in the batch after candidate 3.
