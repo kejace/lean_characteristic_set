@@ -2,6 +2,7 @@
 Copyright (c) 2026 Wu tactic contributors. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 -/
+import CharSetTac.MapCoeffs
 import Mathlib.Algebra.MvPolynomial.Derivation
 import Mathlib.RingTheory.Derivation.Basic
 
@@ -126,6 +127,65 @@ theorem evalDiff_unique (g : DiffPolynomial R σ →ₐ[R] A)
   rw [show (X (i, k) : DiffPolynomial R σ) = Y i k from rfl, key k, evalDiff_Y]
 
 end Universal
+
+/-! ### Over a differential base ring
+
+Everything above takes `R` to be a ring of **constants**: `deriv` is built by `mkDerivation`,
+hence `R`-linear, hence annihilating `R`. Kolchin's `R{Y}` is over a *differential* ring
+whose derivation is extended, and the difference is not cosmetic — over constants there is
+no `x` with `D x = 1`, and the variational complex is genuinely inexact at the Lagrangian
+slot (`Wu.Variational.range_deriv_lt_ker_E`).
+
+The general total derivative is the sum of the two halves:
+
+```
+  D (C r) = C (d r)        (the coefficient derivation)
+  D (y^(k)) = y^(k+1)      (the shift)
+```
+
+Neither half alone can do this. `mkDerivation` only produces the `R`-linear derivations, and
+`MvPolynomial.mapCoeffsDeriv` — which this project had to add, since Mathlib has it only for
+univariate `Polynomial` — only produces the ones killing the indeterminates. -/
+
+section DiffBase
+
+variable {S : Type*} [CommRing S] [Algebra S R]
+
+variable (R σ) in
+/-- **The total derivative over a differential base ring.** Extends `d` on the coefficients
+and shifts the indeterminates. -/
+noncomputable def derivOver (d : Derivation S R R) :
+    Derivation S (DiffPolynomial R σ) (DiffPolynomial R σ) :=
+  MvPolynomial.mapCoeffsDeriv d + (deriv R σ).restrictScalars S
+
+variable {d : Derivation S R R}
+
+/-- **The base ring is no longer constant.** This is the whole point of the construction:
+contrast `deriv`, for which `deriv R σ (C r) = 0` always. -/
+@[simp] theorem derivOver_C (r : R) : derivOver R σ d (C r) = C (d r) := by
+  change MvPolynomial.mapCoeffsDeriv d (C r) + deriv R σ (C r) = _
+  rw [MvPolynomial.mapCoeffsDeriv_C, MvPolynomial.derivation_C, add_zero]
+
+/-- …and the shift is unchanged, because the coefficient derivation treats the
+indeterminates as constants. -/
+@[simp] theorem derivOver_Y (i : σ) (k : ℕ) : derivOver R σ d (Y i k) = Y i (k + 1) := by
+  change MvPolynomial.mapCoeffsDeriv d (X (i, k)) + deriv R σ (X (i, k)) = _
+  rw [MvPolynomial.mapCoeffsDeriv_X, deriv_X, zero_add]
+  rfl
+
+/-- Over a base of constants the two agree — so `derivOver` is a genuine generalisation of
+`deriv` rather than a different object. -/
+theorem derivOver_eq_deriv_of_const (h : d = 0) (p : DiffPolynomial R σ) :
+    derivOver R σ d p = deriv R σ p := by
+  change MvPolynomial.mapCoeffsDeriv d p + deriv R σ p = _
+  rw [h]
+  have hz : MvPolynomial.mapCoeffsDeriv (σ := σ × ℕ) (0 : Derivation S R R) p = 0 := by
+    induction p using MvPolynomial.induction_on' with
+    | add p q hp hq => rw [map_add, hp, hq, add_zero]
+    | monomial m a => rw [MvPolynomial.mapCoeffsDeriv_monomial]; simp
+  rw [hz, zero_add]
+
+end DiffBase
 
 end DiffPolynomial
 
